@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flatland-sim"
+version = "0.1.0"
+description = "A standalone Python package for generating serialized Flatland railway simulation datasets."
+requires-python = ">=3.10"
+dependencies = [
+    "flatland-rl",
+    "dill",
+    "numpy",
+    "pyyaml",
+    "Pillow",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["flatland_sim"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.151.9",
+    "pytest>=9.0.2",
+]
