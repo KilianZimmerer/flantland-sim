@@ -15,8 +15,9 @@ class Pipeline:
         self.config = config
         self.num_scenarios = config["num_scenarios"]
         self.max_steps = config["max_steps"]
-        self.output_path = config["output_path"]
-        self.preview_output_dir = config["preview_output_dir"]
+        simulation_dir = config["simulation_dir"]
+        self.pkl_path = Path(simulation_dir) / "scenarios.pkl"
+        self.previews_dir = Path(simulation_dir) / "previews"
         self.sampler = RandomConfigSampler(config)
         self.preview = preview
 
@@ -77,16 +78,16 @@ class Pipeline:
                 except Exception as e:
                     logging.warning(f"Scenario {i} preview failed: {e}")
 
-        Path(self.output_path).parent.mkdir(parents=True, exist_ok=True)
-        with open(self.output_path, "wb") as f:
+        self.pkl_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.pkl_path, "wb") as f:
             dill.dump(snapshots, f)
 
-        print(f"Saved {len(snapshots)} scenarios ({skip_count} skipped) to {self.output_path}")
+        print(f"Saved {len(snapshots)} scenarios ({skip_count} skipped) to {self.pkl_path}")
         return snapshots
 
     def _save_preview(self, frames: list, scenario_id: int) -> None:
-        Path(self.preview_output_dir).mkdir(parents=True, exist_ok=True)
-        gif_path = Path(self.preview_output_dir) / f"scenario_{scenario_id}.gif"
+        self.previews_dir.mkdir(parents=True, exist_ok=True)
+        gif_path = self.previews_dir / f"scenario_{scenario_id}.gif"
         if frames:
             frames[0].save(
                 gif_path,
@@ -95,7 +96,7 @@ class Pipeline:
                 duration=100,
                 loop=0,
             )
-        print(f"Saved preview to {self.preview_output_dir}/scenario_{scenario_id}.gif")
+        print(f"Saved preview to {self.previews_dir}/scenario_{scenario_id}.gif")
 
 
 def generate_scenarios(config: dict | str, preview: bool = False) -> list[ScenarioSnapshot]:

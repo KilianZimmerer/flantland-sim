@@ -418,6 +418,7 @@ source = { editable = "." }
 dependencies = [
     { name = "dill" },
     { name = "flatland-rl" },
+    { name = "matplotlib" },
     { name = "numpy" },
     { name = "pillow" },
     { name = "pyyaml" },
@@ -433,6 +434,7 @@ dev = [
 requires-dist = [
     { name = "dill" },
     { name = "flatland-rl" },
+    { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "numpy" },
     { name = "pillow" },
     { name = "pyyaml" },

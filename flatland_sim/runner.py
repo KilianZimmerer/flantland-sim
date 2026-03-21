@@ -33,8 +33,12 @@ class SimulationRunner:
             return 0
 
     @staticmethod
-    def _transition_label(action: int, prev_pos, next_pos, next_status: str, is_terminal: bool) -> int:
+    def _transition_label(action: int, prev_pos, next_pos, cur_status: str, next_status: str, is_terminal: bool) -> int:
         """Compute transition_label for one agent based on the physical outcome."""
+        # Already DONE in a previous step — agent is inactive, don't count again
+        if cur_status == "DONE":
+            return WAITING
+        # Transitioning into DONE this step (arrival)
         if is_terminal or next_status == "DONE":
             return END
         if prev_pos is None:
@@ -147,21 +151,18 @@ class SimulationRunner:
                     action=agent_record["action_taken"],
                     prev_pos=agent_record["position"],
                     next_pos=nxt_agents[j]["position"],
+                    cur_status=agent_record["status"],
                     next_status=nxt_agents[j]["status"],
                     is_terminal=False,
                 )
 
-        # Final timestep: next_position = None, transition_label = END or WAITING
+        # Drop leading timesteps where no agent has appeared on the grid yet
+        while timesteps and all(a["position"] is None for a in timesteps[0]["agents"]):
+            timesteps.pop(0)
+
+        # Drop the final timestep — next_position and transition_label are unknowable
+        # without taking another step, so every label in the returned list is ground truth.
         if timesteps:
-            is_terminal = True  # last recorded step is always terminal
-            for agent_record in timesteps[-1]["agents"]:
-                agent_record["next_position"] = None
-                agent_record["transition_label"] = self._transition_label(
-                    action=agent_record["action_taken"],
-                    prev_pos=agent_record["position"],
-                    next_pos=None,
-                    next_status=agent_record["status"],
-                    is_terminal=is_terminal,
-                )
+            timesteps.pop()
 
         return timesteps

@@ -13,6 +13,7 @@ dependencies = [
     "numpy",
     "pyyaml",
     "Pillow",
+    "matplotlib>=3.10.8",
 ]
 
 [tool.hatch.build.targets.wheel]

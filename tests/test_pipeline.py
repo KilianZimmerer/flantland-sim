@@ -25,8 +25,7 @@ def make_config(output_dir: str, seed: int = 42, num_scenarios: int = 3) -> dict
         "seed": seed,
         "num_scenarios": num_scenarios,
         "max_steps": 50,
-        "output_path": str(Path(output_dir) / "scenarios.pkl"),
-        "preview_output_dir": str(Path(output_dir) / "previews"),
+        "simulation_dir": str(output_dir),
         "randomization": {
             "num_trains": {"min": 2, "max": 2},
             "grid_width": {"min": 30, "max": 30},
@@ -190,7 +189,8 @@ def test_p14_serialization_round_trip(seed, tmp_path):
 
         returned = Pipeline(config).run()
 
-    with open(config["output_path"], "rb") as f:
+    pkl_path = Path(config["simulation_dir"]) / "scenarios.pkl"
+    with open(pkl_path, "rb") as f:
         loaded = dill.load(f)
 
     assert len(loaded) == len(returned)
@@ -209,18 +209,18 @@ def test_empty_list_on_all_failures(tmp_path):
         MockGen.return_value.build.side_effect = RuntimeError("always fail")
         result = Pipeline(config).run()
 
+    pkl_path = Path(config["simulation_dir"]) / "scenarios.pkl"
     assert result == []
-    assert os.path.exists(config["output_path"])
-    with open(config["output_path"], "rb") as f:
+    assert os.path.exists(pkl_path)
+    with open(pkl_path, "rb") as f:
         loaded = dill.load(f)
     assert loaded == []
 
 
 def test_parent_dir_creation(tmp_path):
-    """Pipeline creates deeply nested parent directories for output_path."""
-    nested_output = str(tmp_path / "a" / "b" / "c" / "scenarios.pkl")
-    config = make_config(str(tmp_path), num_scenarios=1)
-    config["output_path"] = nested_output
+    """Pipeline creates deeply nested parent directories for simulation_dir."""
+    nested_sim_dir = str(tmp_path / "a" / "b" / "c")
+    config = make_config(nested_sim_dir, num_scenarios=1)
 
     def build_side_effect():
         return _make_mock_env(), {}
@@ -234,4 +234,55 @@ def test_parent_dir_creation(tmp_path):
 
         Pipeline(config).run()
 
-    assert os.path.exists(nested_output)
+    assert os.path.exists(Path(nested_sim_dir) / "scenarios.pkl")
+
+
+# ---------------------------------------------------------------------------
+# Task 1.2: test_pipeline_output_paths
+# ---------------------------------------------------------------------------
+
+def test_pipeline_output_paths(tmp_path):
+    """scenarios.pkl lands at {simulation_dir}/scenarios.pkl and GIFs at {simulation_dir}/previews/."""
+    sim_dir = str(tmp_path / "sim_output")
+    config = make_config(sim_dir, num_scenarios=1)
+
+    def build_side_effect():
+        return _make_mock_env(), {}
+
+    with patch("flatland_sim.pipeline.ScenarioGenerator") as MockGen, \
+         patch("flatland_sim.pipeline.SimulationRunner") as MockRunner:
+        MockGen.return_value.build.side_effect = build_side_effect
+        mock_runner_instance = MockRunner.return_value
+        mock_runner_instance.run.return_value = []
+        mock_runner_instance._frames = []
+
+        pipeline = Pipeline(config)
+
+    assert pipeline.pkl_path == Path(sim_dir) / "scenarios.pkl"
+    assert pipeline.previews_dir == Path(sim_dir) / "previews"
+
+
+# ---------------------------------------------------------------------------
+# Task 1.1: Property 1 — Output path derivation
+# Feature: scenarios-analysis, Property 1: Output path derivation
+# ---------------------------------------------------------------------------
+
+@settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@given(sim_dir=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="/_-")))
+def test_p1_output_path_derivation(sim_dir, tmp_path):
+    """All paths written by Pipeline are sub-paths of simulation_dir."""
+    config = make_config(sim_dir, num_scenarios=1)
+    pipeline = Pipeline.__new__(Pipeline)
+    pipeline.config = config
+    pipeline.num_scenarios = config["num_scenarios"]
+    pipeline.max_steps = config["max_steps"]
+    pipeline.previews_dir = Path(sim_dir) / "previews"
+    pipeline.pkl_path = Path(sim_dir) / "scenarios.pkl"
+    pipeline.preview = False
+    pipeline.sampler = MagicMock()
+
+    sim_path = Path(sim_dir)
+    assert pipeline.pkl_path.parts[:len(sim_path.parts)] == sim_path.parts
+    assert pipeline.previews_dir.parts[:len(sim_path.parts)] == sim_path.parts
+    assert "output_path" not in config
+    assert "preview_output_dir" not in config

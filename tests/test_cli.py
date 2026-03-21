@@ -1,47 +1,141 @@
-"""Unit tests for run.py CLI argument parsing (Req 8.1, 8.2)."""
+"""Unit tests for run.py CLI argument parsing and main() behaviour."""
 import importlib
 import sys
-from unittest.mock import patch
+import tempfile
+import dill
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+import yaml
 
 
-def _parse_args(argv):
-    """Import run module and parse args without executing main."""
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
-    parser.add_argument("--preview", action="store_true")
-    return parser.parse_args(argv)
+def _make_config(tmp_path: Path) -> Path:
+    """Write a minimal config.yaml into tmp_path and return its path."""
+    cfg = {
+        "seed": 42,
+        "num_scenarios": 1,
+        "max_steps": 50,
+        "simulation_dir": str(tmp_path),
+        "randomization": {
+            "num_trains": {"min": 2, "max": 4},
+            "grid_width": {"min": 20, "max": 30},
+            "grid_height": {"min": 20, "max": 30},
+            "num_cities": {"min": 2, "max": 3},
+            "max_rails_between_cities": {"min": 1, "max": 2},
+            "max_rail_pairs_in_city": {"min": 1, "max": 2},
+        },
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.dump(cfg))
+    return config_path
 
 
-def test_default_config_and_no_preview():
-    args = _parse_args([])
-    assert args.config == "config.yaml"
-    assert args.preview is False
+def _make_pkl(tmp_path: Path) -> Path:
+    """Create an empty scenarios.pkl in tmp_path."""
+    pkl_path = tmp_path / "scenarios.pkl"
+    with open(pkl_path, "wb") as f:
+        dill.dump([], f)
+    return pkl_path
 
 
-def test_custom_config():
-    args = _parse_args(["--config", "my_config.yaml"])
-    assert args.config == "my_config.yaml"
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _reload_run():
+    import run
+    importlib.reload(run)
+    return run
 
 
-def test_preview_flag():
-    args = _parse_args(["--preview"])
-    assert args.preview is True
+# ---------------------------------------------------------------------------
+# Basic Pipeline invocation
+# ---------------------------------------------------------------------------
 
+def test_main_calls_pipeline_run(tmp_path):
+    """main() calls Pipeline.run() when no --analyze-only flag is given."""
+    config_path = _make_config(tmp_path)
 
-def test_config_and_preview_together():
-    args = _parse_args(["--config", "other.yaml", "--preview"])
-    assert args.config == "other.yaml"
-    assert args.preview is True
-
-
-def test_main_calls_generate_scenarios():
-    """run.py main() calls generate_scenarios with correct args (Req 8.3)."""
-    from unittest.mock import MagicMock
-    fake_module = MagicMock()
-    with patch.dict(sys.modules, {"flatland_sim": fake_module, "flatland_sim.pipeline": MagicMock(), "flatland_sim.snapshot": MagicMock()}):
-        with patch("sys.argv", ["run.py", "--config", "test.yaml", "--preview"]):
-            import run
-            importlib.reload(run)
+    with patch("sys.argv", ["run.py", "--config", str(config_path)]):
+        with patch("flatland_sim.pipeline.Pipeline.run") as mock_run:
+            run = _reload_run()
             run.main()
-        fake_module.generate_scenarios.assert_called_once_with(config="test.yaml", preview=True)
+            mock_run.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# --analyze flag
+# ---------------------------------------------------------------------------
+
+def test_cli_analyze_flag(tmp_path):
+    """--analyze causes Pipeline.run, Analyzer.analyse, ReportWriter.write to be called."""
+    config_path = _make_config(tmp_path)
+    _make_pkl(tmp_path)
+
+    fake_store = MagicMock()
+    fake_store.snapshots = []  # empty — no ChartRenderer calls needed
+
+    fake_report = MagicMock()
+    fake_report.per_scenario = []
+
+    with patch("sys.argv", ["run.py", "--config", str(config_path), "--analyze"]):
+        with patch("flatland_sim.pipeline.Pipeline.run") as mock_pipeline_run, \
+             patch("flatland_sim.scenario_store.ScenarioStore.load", return_value=fake_store) as mock_load, \
+             patch("flatland_sim.analyzer.Analyzer.analyse", return_value=fake_report) as mock_analyse, \
+             patch("flatland_sim.report_writer.ReportWriter.write") as mock_write, \
+             patch("flatland_sim.chart_renderer.ChartRenderer.render") as mock_render:
+
+            run = _reload_run()
+            run.main()
+
+            mock_pipeline_run.assert_called_once()
+            mock_load.assert_called_once()
+            mock_analyse.assert_called_once()
+            mock_write.assert_called_once()
+            mock_render.assert_not_called()  # no snapshots
+
+
+# ---------------------------------------------------------------------------
+# --analyze-only flag
+# ---------------------------------------------------------------------------
+
+def test_cli_analyze_only_flag(tmp_path):
+    """--analyze-only skips Pipeline.run but still runs analysis."""
+    config_path = _make_config(tmp_path)
+    _make_pkl(tmp_path)
+
+    fake_store = MagicMock()
+    fake_store.snapshots = []
+
+    fake_report = MagicMock()
+    fake_report.per_scenario = []
+
+    with patch("sys.argv", ["run.py", "--config", str(config_path), "--analyze-only"]):
+        with patch("flatland_sim.pipeline.Pipeline.run") as mock_pipeline_run, \
+             patch("flatland_sim.scenario_store.ScenarioStore.load", return_value=fake_store), \
+             patch("flatland_sim.analyzer.Analyzer.analyse", return_value=fake_report), \
+             patch("flatland_sim.report_writer.ReportWriter.write"), \
+             patch("flatland_sim.chart_renderer.ChartRenderer.render"):
+
+            run = _reload_run()
+            run.main()
+
+            mock_pipeline_run.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# --analyze-only with missing pkl
+# ---------------------------------------------------------------------------
+
+def test_cli_analyze_only_missing_pkl(tmp_path):
+    """--analyze-only exits non-zero when scenarios.pkl does not exist."""
+    config_path = _make_config(tmp_path)
+    # deliberately do NOT create scenarios.pkl
+
+    with patch("sys.argv", ["run.py", "--config", str(config_path), "--analyze-only"]):
+        with patch("flatland_sim.pipeline.Pipeline.run"):
+            run = _reload_run()
+            with pytest.raises(SystemExit) as exc_info:
+                run.main()
+            assert exc_info.value.code != 0

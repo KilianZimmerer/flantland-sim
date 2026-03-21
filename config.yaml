@@ -1,8 +1,7 @@
 seed: 42
 num_scenarios: 10
 max_steps: 500
-output_path: "output/scenarios.pkl"
-preview_output_dir: "output/previews"
+simulation_dir: "output"
 
 randomization:
   num_trains:

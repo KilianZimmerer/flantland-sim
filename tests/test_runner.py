@@ -82,14 +82,15 @@ def test_p7_timestep_record_structure(seed):
 # P8 – next_position consistency
 # ---------------------------------------------------------------------------
 
-# Feature: flatland-sim, Property 8: next_position equals following timestep position (non-final); None for final
+# Feature: flatland-sim, Property 8: next_position equals following timestep position for all timesteps
 @settings(max_examples=20)
 @given(seed=st.integers(min_value=0, max_value=999))
 def test_p8_next_position_consistency(seed):
     env = make_small_env(seed=seed)
     timesteps = SimulationRunner(env, max_steps=200).run()
 
-    # Non-final timesteps: next_position[i] == position in next timestep
+    # The final timestep is dropped, so every remaining timestep has a successor.
+    # next_position[i] must equal position in the following timestep for all steps.
     for t in range(len(timesteps) - 1):
         current_agents = timesteps[t]["agents"]
         next_agents = timesteps[t + 1]["agents"]
@@ -98,13 +99,6 @@ def test_p8_next_position_consistency(seed):
                 f"Step {t}, agent {i}: next_position {agent['next_position']} "
                 f"!= following position {next_agents[i]['position']}"
             )
-
-    # Final timestep: all next_position must be None
-    for agent in timesteps[-1]["agents"]:
-        assert agent["next_position"] is None, (
-            f"Final timestep agent {agent['id']}: expected next_position=None, "
-            f"got {agent['next_position']}"
-        )
 
 
 # ---------------------------------------------------------------------------
