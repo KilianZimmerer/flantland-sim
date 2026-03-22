@@ -19,6 +19,7 @@ class ScenarioMetrics:
     free_turn_count: int
     blocked_count: int
     end_count: int
+    done_count: int
     avg_blocked_ratio: float      # blocked_count / (total_steps * num_agents) or 0.0
 
 
@@ -60,6 +61,7 @@ class Analyzer:
         free_turn_count = 0
         blocked_count = 0
         end_count = 0
+        done_count = 0
 
         # Track which agents have seen at least one END label
         agents_with_end: set[int] = set()
@@ -80,6 +82,8 @@ class Analyzer:
                 elif label == 5:
                     end_count += 1
                     agents_with_end.add(agent["id"])
+                elif label == 6:
+                    done_count += 1
 
         completion_rate = len(agents_with_end) / num_agents if num_agents > 0 else 0.0
         deadlock_detected = total_steps < self._max_steps and completion_rate < 1.0
@@ -98,6 +102,7 @@ class Analyzer:
             free_turn_count=free_turn_count,
             blocked_count=blocked_count,
             end_count=end_count,
+            done_count=done_count,
             avg_blocked_ratio=avg_blocked_ratio,
         )
 

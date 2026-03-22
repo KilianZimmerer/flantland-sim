@@ -43,6 +43,7 @@ def test_analyzer_label_counts_sum(snap):
         + metrics.free_turn_count
         + metrics.blocked_count
         + metrics.end_count
+        + metrics.done_count
     )
     assert total == metrics.total_steps * snap.num_agents
 

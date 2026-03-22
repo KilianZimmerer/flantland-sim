@@ -12,6 +12,7 @@ FREE_FORWARD = 2
 FREE_TURN = 3
 BLOCKED = 4
 END = 5
+DONE = 6
 
 _DEADLOCK_WINDOW = 5
 
@@ -35,9 +36,9 @@ class SimulationRunner:
     @staticmethod
     def _transition_label(action: int, prev_pos, next_pos, cur_status: str, next_status: str, is_terminal: bool) -> int:
         """Compute transition_label for one agent based on the physical outcome."""
-        # Already DONE in a previous step — agent is inactive, don't count again
+        # Already DONE in a previous step — agent is inactive
         if cur_status == "DONE":
-            return WAITING
+            return DONE
         # Transitioning into DONE this step (arrival)
         if is_terminal or next_status == "DONE":
             return END
