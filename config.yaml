@@ -1,12 +1,12 @@
 seed: 42
-num_scenarios: 10
+num_scenarios: 1
 max_steps: 500
-simulation_dir: "output"
+simulation_dir: "output/tst"
 
 randomization:
   num_trains:
-    min: 2
-    max: 8
+    min: 1
+    max: 1
   grid_width:
     min: 20
     max: 50
