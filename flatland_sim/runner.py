@@ -9,10 +9,11 @@ from PIL import Image
 WAITING = 0
 INTENTIONAL_STOP = 1
 FREE_FORWARD = 2
-FREE_TURN = 3
-BLOCKED = 4
-END = 5
-DONE = 6
+FREE_LEFT = 3
+FREE_RIGHT = 4
+BLOCKED = 5
+END = 6
+DONE = 7
 
 _DEADLOCK_WINDOW = 5
 
@@ -48,8 +49,10 @@ class SimulationRunner:
             return INTENTIONAL_STOP
         if action == 2 and prev_pos != next_pos:
             return FREE_FORWARD
-        if action in (1, 3) and prev_pos != next_pos:
-            return FREE_TURN
+        if action == 1 and prev_pos != next_pos:
+            return FREE_LEFT
+        if action == 3 and prev_pos != next_pos:
+            return FREE_RIGHT
         if action in (1, 2, 3) and prev_pos == next_pos:
             return BLOCKED
         # fallback (e.g. action==0 / DONE)

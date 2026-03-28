@@ -21,7 +21,7 @@ def snapshot_strategy(draw) -> ScenarioSnapshot:
     for step in range(num_timesteps):
         agents = []
         for agent_id in range(num_agents):
-            label = draw(st.integers(min_value=0, max_value=6))
+            label = draw(st.integers(min_value=0, max_value=7))
             agents.append({
                 "id": agent_id,
                 "position": None,

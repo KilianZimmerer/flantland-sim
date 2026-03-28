@@ -20,7 +20,7 @@ def test_analyzer_completion_rate(snap):
     agents_with_end = set()
     for timestep in snap.timesteps:
         for agent in timestep["agents"]:
-            if agent["transition_label"] == 5:
+            if agent["transition_label"] == 6:
                 agents_with_end.add(agent["id"])
 
     expected = len(agents_with_end) / num_agents if num_agents > 0 else 0.0
@@ -40,7 +40,8 @@ def test_analyzer_label_counts_sum(snap):
         metrics.waiting_count
         + metrics.intentional_stop_count
         + metrics.free_forward_count
-        + metrics.free_turn_count
+        + metrics.free_left_count
+        + metrics.free_right_count
         + metrics.blocked_count
         + metrics.end_count
         + metrics.done_count

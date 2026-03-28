@@ -16,7 +16,8 @@ class ScenarioMetrics:
     waiting_count: int
     intentional_stop_count: int
     free_forward_count: int
-    free_turn_count: int
+    free_left_count: int
+    free_right_count: int
     blocked_count: int
     end_count: int
     done_count: int
@@ -58,7 +59,8 @@ class Analyzer:
         waiting_count = 0
         intentional_stop_count = 0
         free_forward_count = 0
-        free_turn_count = 0
+        free_left_count = 0
+        free_right_count = 0
         blocked_count = 0
         end_count = 0
         done_count = 0
@@ -76,13 +78,15 @@ class Analyzer:
                 elif label == 2:
                     free_forward_count += 1
                 elif label == 3:
-                    free_turn_count += 1
+                    free_left_count += 1
                 elif label == 4:
-                    blocked_count += 1
+                    free_right_count += 1
                 elif label == 5:
+                    blocked_count += 1
+                elif label == 6:
                     end_count += 1
                     agents_with_end.add(agent["id"])
-                elif label == 6:
+                elif label == 7:
                     done_count += 1
 
         completion_rate = len(agents_with_end) / num_agents if num_agents > 0 else 0.0
@@ -99,7 +103,8 @@ class Analyzer:
             waiting_count=waiting_count,
             intentional_stop_count=intentional_stop_count,
             free_forward_count=free_forward_count,
-            free_turn_count=free_turn_count,
+            free_left_count=free_left_count,
+            free_right_count=free_right_count,
             blocked_count=blocked_count,
             end_count=end_count,
             done_count=done_count,

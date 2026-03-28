@@ -14,7 +14,7 @@ class ChartRenderer:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
         # Pre-compute per-timestep label counts
-        label_names = ["waiting", "intentional_stop", "free_forward", "free_turn", "blocked", "end", "done"]
+        label_names = ["waiting", "intentional_stop", "free_forward", "free_left", "free_right", "blocked", "end", "done"]
         per_step_counts = {name: [] for name in label_names}
         for step in snap.timesteps:
             step_counts = {name: 0 for name in label_names}
@@ -37,13 +37,14 @@ class ChartRenderer:
         ax2.stackplot(
             steps,
             per_step_counts["free_forward"],
-            per_step_counts["free_turn"],
+            per_step_counts["free_left"],
+            per_step_counts["free_right"],
             per_step_counts["waiting"],
             per_step_counts["intentional_stop"],
             per_step_counts["blocked"],
             per_step_counts["end"],
             per_step_counts["done"],
-            labels=["free_forward", "free_turn", "waiting", "intentional_stop", "blocked", "end", "done"],
+            labels=["free_forward", "free_left", "free_right", "waiting", "intentional_stop", "blocked", "end", "done"],
             alpha=0.8,
         )
         ax2.set_title("Agent State Composition")
