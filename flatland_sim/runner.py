@@ -26,9 +26,45 @@ class SimulationRunner:
         self.renderer = renderer
         self._frames = []
 
-    def _get_action(self, state: TrainState) -> int:
+    def _get_valid_actions(self, agent_handle: int) -> list[int]:
+        """Return the list of Flatland actions (1-4) that lead to a valid
+        transition from the agent's current cell and orientation.
+
+        Actions: 1=left, 2=forward, 3=right, 4=stop.
+        """
+        agent = self.env.agents[agent_handle]
+        if agent.position is None:
+            return [2]  # not on grid yet – only forward/depart makes sense
+
+        row, col = agent.position
+        direction = agent.direction
+        transition_map = self.env.rail.get_full_transitions(row, col)
+
+        # Flatland direction encoding: 0=N, 1=E, 2=S, 3=W
+        # Action mapping relative to current direction:
+        #   left  (1) → (direction - 1) % 4
+        #   fwd   (2) → direction
+        #   right (3) → (direction + 1) % 4
+        action_to_new_dir = {
+            1: (direction - 1) % 4,
+            2: direction,
+            3: (direction + 1) % 4,
+        }
+
+        valid = []
+        for action, new_dir in action_to_new_dir.items():
+            # transition_map is a 16-bit int; bits [new_dir] for each source dir
+            if (transition_map >> ((3 - direction) * 4 + (3 - new_dir))) & 1:
+                valid.append(action)
+
+        # Stop (4) is always a legal action for a moving/stopped agent
+        valid.append(4)
+        return valid
+
+    def _get_action(self, agent_handle: int, state: TrainState) -> int:
         if state in (TrainState.MOVING, TrainState.STOPPED):
-            return random.randint(1, 4)
+            valid = self._get_valid_actions(agent_handle)
+            return random.choice(valid)
         elif state in (TrainState.WAITING, TrainState.READY_TO_DEPART):
             return 2
         else:  # TrainState.DONE
@@ -71,7 +107,7 @@ class SimulationRunner:
                 break
 
             agents = self.env.agents
-            actions = {i: self._get_action(agent.state) for i, agent in enumerate(agents)}
+            actions = {i: self._get_action(i, agent.state) for i, agent in enumerate(agents)}
 
             # Snapshot positions before stepping
             pre_positions = [agent.position for agent in agents]
