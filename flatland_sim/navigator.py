@@ -212,11 +212,11 @@ class NavigatorApp:
 
         self._tick_id: str | None = None
 
-        # -- info panel frame --
+        # -- message log panel --
         self._info_frame = ttk.Frame(self._root)
         self._info_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(self._info_frame, text="Agent Info:").pack(anchor=tk.W)
+        ttk.Label(self._info_frame, text="Messages:").pack(anchor=tk.W)
         self._info_text = tk.Text(self._info_frame, height=6, state=tk.DISABLED, wrap=tk.NONE)
         self._info_text.pack(fill=tk.X, expand=True)
 
@@ -398,8 +398,13 @@ class NavigatorApp:
                     tags="transition",
                 )
 
+    # Short abbreviations for transition labels shown on canvas
+    _TRANSITION_SHORT: dict[int, str] = {
+        0: "W", 1: "IS", 2: "FF", 3: "FL", 4: "FR", 5: "BL", 6: "E", 7: "D",
+    }
+
     def _render_agents(self) -> None:
-        """Redraw only the agent markers for the current timestep (no flicker)."""
+        """Redraw agent markers and inline labels for the current timestep."""
         self._canvas.delete("agent")
         if self._snapshot is None:
             return
@@ -427,6 +432,20 @@ class NavigatorApp:
                     fill=color, outline="black", width=1, tags="agent",
                 )
 
+                # Inline label: agent id + short transition code
+                trans = agent.get("transition_label", -1)
+                short = self._TRANSITION_SHORT.get(trans, "?")
+                direction = agent.get("direction", "?")
+                label_text = f"A{aid} d{direction} {short}"
+                font_size = max(7, int(cell * 0.18))
+                self._canvas.create_text(
+                    cx, cy - radius - font_size * 0.7,
+                    text=label_text,
+                    fill=color,
+                    font=("TkDefaultFont", font_size),
+                    tags="agent",
+                )
+
     def _render_grid(self) -> None:
         """Full redraw — static grid + agents. Used by tests and initial render."""
         self._render_static()
@@ -452,37 +471,46 @@ class NavigatorApp:
         """Reset the slider guard after the event loop has processed pending events."""
         self._updating_slider = False
 
-    def _update_info_panel(self) -> None:
-        """Update the agent information panel with current timestep agent details."""
+    def _log_message(self, level: str, text: str) -> None:
+        """Append a timestamped message to the message log panel.
+
+        *level* should be one of ``"INFO"``, ``"WARNING"``, or ``"ERROR"``.
+        """
         import tkinter as tk
 
+        idx = self._engine.current_index
+        line = f"[Step {idx}] {level}: {text}"
         self._info_text.configure(state=tk.NORMAL)
-        self._info_text.delete("1.0", tk.END)
+        # Append on a new line if content already exists
+        current = self._info_text.get("1.0", tk.END).strip()  # type: ignore[arg-type]
+        if current:
+            self._info_text.insert(tk.END, "\n" + line)
+        else:
+            self._info_text.insert(tk.END, line)
+        self._info_text.see(tk.END)
+        self._info_text.configure(state=tk.DISABLED)
 
+    def _update_info_panel(self) -> None:
+        """Check current timestep for notable conditions and log messages."""
         if self._snapshot is None:
-            self._info_text.configure(state=tk.DISABLED)
             return
 
         idx = self._engine.current_index
         if idx >= len(self._snapshot.timesteps):
-            self._info_text.configure(state=tk.DISABLED)
             return
 
         timestep = self._snapshot.timesteps[idx]
-        lines: list[str] = []
-        for agent in timestep.get("agents", []):
-            aid = agent.get("id", "?")
-            status = agent.get("status", "?")
-            pos = agent.get("position")
-            direction = agent.get("direction", "?")
-            transition = format_transition_label(agent.get("transition_label", -1))
-            pos_str = f"({pos[0]}, {pos[1]})" if pos is not None else "None"
-            lines.append(
-                f"Agent {aid} | status={status} | pos={pos_str} | dir={direction} | transition={transition}"
-            )
+        agents = timestep.get("agents", [])
 
-        self._info_text.insert("1.0", "\n".join(lines))
-        self._info_text.configure(state=tk.DISABLED)
+        blocked = [a for a in agents if a.get("transition_label") == 5]
+        if blocked:
+            ids = ", ".join(str(a.get("id", "?")) for a in blocked)
+            self._log_message("WARNING", f"Blocked agents: {ids}")
+
+        ended = [a for a in agents if a.get("transition_label") in (6, 7)]
+        if ended:
+            ids = ", ".join(str(a.get("id", "?")) for a in ended)
+            self._log_message("INFO", f"Agents reached target: {ids}")
 
     # -- public API --
 

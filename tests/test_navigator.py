@@ -937,7 +937,7 @@ class TestTimelineSlider:
 
 
 class TestInfoPanel:
-    """Tests for the agent information panel (Task 8)."""
+    """Tests for the message log panel (Task 8)."""
 
     def _build_app(self, snapshots: list[ScenarioSnapshot]) -> "NavigatorApp":
         """Create a NavigatorApp with mocked tkinter, including a trackable Text widget."""
@@ -984,11 +984,19 @@ class TestInfoPanel:
             text_widget._content = ""
 
         def text_insert(pos, content):
-            text_widget._content = content
+            if pos == "end" and text_widget._content:
+                text_widget._content += content
+            else:
+                text_widget._content += content
+
+        def text_get(start, end):
+            return text_widget._content
 
         text_widget.configure = text_configure
         text_widget.delete = text_delete
         text_widget.insert = text_insert
+        text_widget.get = text_get
+        text_widget.see = MagicMock()
         mock_tk.Text.return_value = text_widget
 
         with patch.dict("sys.modules", {"tkinter": mock_tk, "tkinter.ttk": mock_ttk}):
@@ -1009,66 +1017,71 @@ class TestInfoPanel:
         app = self._build_app([snap])
         assert hasattr(app, "_info_text")
 
-    def test_info_panel_shows_agent_details(self):
-        """_update_info_panel should display agent id, status, position, direction, transition."""
+    def test_log_message_appends_to_panel(self):
+        """_log_message should append a formatted line to the text widget."""
         snap = _make_snapshot(10, num_timesteps=3)
         app = self._build_app([snap])
-        app._update_info_panel()
+        app._log_message("INFO", "test message")
         content = app._info_text._content
-        assert "Agent 0" in content
-        assert "status=ACTIVE" in content
-        assert "pos=(0, 0)" in content
-        assert "dir=0" in content
-        assert "transition=FREE_FORWARD" in content
+        assert "INFO" in content
+        assert "test message" in content
 
-    def test_info_panel_uses_format_transition_label(self):
-        """Transition labels should use human-readable names via format_transition_label."""
+    def test_log_message_includes_step(self):
+        """_log_message should include the current step number."""
+        snap = _make_snapshot(10, num_timesteps=5)
+        app = self._build_app([snap])
+        app._engine.jump_to(3)
+        app._log_message("WARNING", "something happened")
+        content = app._info_text._content
+        assert "[Step 3]" in content
+
+    def test_update_info_panel_logs_blocked_agents(self):
+        """_update_info_panel should log a WARNING when agents are blocked."""
         snap = _make_snapshot_with_rail(num_agents=1, num_timesteps=1)
-        # transition_label=2 -> FREE_FORWARD
+        snap.timesteps[0]["agents"][0]["transition_label"] = 5  # BLOCKED
         app = self._build_app([snap])
         app._update_info_panel()
         content = app._info_text._content
-        assert "FREE_FORWARD" in content
+        assert "WARNING" in content
+        assert "Blocked" in content
 
-    def test_info_panel_updates_on_step(self):
-        """Stepping forward should update the info panel with new timestep data."""
+    def test_update_info_panel_logs_ended_agents(self):
+        """_update_info_panel should log INFO when agents reach target."""
+        snap = _make_snapshot_with_rail(num_agents=1, num_timesteps=1)
+        snap.timesteps[0]["agents"][0]["transition_label"] = 6  # END
+        app = self._build_app([snap])
+        app._update_info_panel()
+        content = app._info_text._content
+        assert "INFO" in content
+        assert "reached target" in content
+
+    def test_update_info_panel_no_message_for_normal_step(self):
+        """_update_info_panel should not log anything for a normal FREE_FORWARD step."""
         snap = _make_snapshot(10, num_timesteps=3)
         app = self._build_app([snap])
-        app._on_step_fwd()
-        content = app._info_text._content
-        # At timestep 1, agent 0 position is (0, 1)
-        assert "pos=(0, 1)" in content
-
-    def test_info_panel_multiple_agents(self):
-        """Info panel should list all agents in the timestep."""
-        snap = _make_snapshot_with_rail(num_agents=2, num_timesteps=1)
-        app = self._build_app([snap])
         app._update_info_panel()
         content = app._info_text._content
-        assert "Agent 0" in content
-        assert "Agent 1" in content
+        assert content == ""
 
-    def test_info_panel_empty_when_no_snapshot(self):
-        """With no snapshot loaded, info panel should be empty."""
+    def test_update_info_panel_no_crash_when_no_snapshot(self):
+        """_update_info_panel with no snapshot should be a no-op."""
         app = self._build_app([])
         app._update_info_panel()
         assert app._info_text._content == ""
 
-    def test_info_panel_agent_with_none_position(self):
-        """Agent with position=None should display 'None' for position."""
-        snap = _make_snapshot_with_rail(num_agents=1, num_timesteps=1)
-        snap.timesteps[0]["agents"][0]["position"] = None
-        app = self._build_app([snap])
-        app._update_info_panel()
-        content = app._info_text._content
-        assert "pos=None" in content
-
-    def test_info_panel_is_read_only(self):
-        """After update, the Text widget should be set back to DISABLED state."""
+    def test_info_panel_is_read_only_after_log(self):
+        """After _log_message, the Text widget should be set back to DISABLED state."""
         snap = _make_snapshot(10, num_timesteps=3)
         app = self._build_app([snap])
-        app._update_info_panel()
+        app._log_message("ERROR", "something broke")
         assert app._info_text._state == "disabled"
+
+    def test_render_agents_draws_text_labels(self):
+        """_render_agents should draw create_text for each visible agent."""
+        snap = _make_snapshot_with_rail(num_agents=2)
+        app = self._build_app([snap])
+        text_calls = app._canvas.create_text.call_args_list
+        assert len(text_calls) == 2
 
 
 # ══════════════════════════════════════════════════════════════════════════
