@@ -43,6 +43,16 @@ uv run python run.py --config config.yaml --preview
 | `--analyze` | off | Run analysis pipeline after generation |
 | `--analyze-only` | off | Run analysis only (skip generation) |
 
+### Scenario Navigator (GUI)
+
+Launch the interactive GUI to browse and replay scenarios from an existing `.pkl` file:
+
+```bash
+uv run python -m flatland_sim.navigator output/scenarios.pkl
+```
+
+The navigator renders the rail grid on a canvas and lets you step through timesteps, play/pause the simulation, and inspect per-agent state including transition labels.
+
 ### Python API
 
 ```python
