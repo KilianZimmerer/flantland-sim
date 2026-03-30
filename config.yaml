@@ -1,5 +1,5 @@
 seed: 42
-num_scenarios: 20
+num_scenarios: 5
 max_steps: 500
 simulation_dir: "output/tst"
 

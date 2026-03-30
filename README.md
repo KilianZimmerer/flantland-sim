@@ -18,22 +18,16 @@ Generate scenarios:
 uv run python run.py --config config.yaml
 ```
 
-Generate scenarios and run analysis:
+Generate scenarios with preview and run analysis:
 
 ```bash
-uv run python run.py --config config.yaml --analyze
+uv run python run.py --config config.yaml --preview --analyze
 ```
 
 Run analysis only against an existing `scenarios.pkl`:
 
 ```bash
 uv run python run.py --config config.yaml --analyze-only
-```
-
-With preview GIFs:
-
-```bash
-uv run python run.py --config config.yaml --preview
 ```
 
 | Argument | Default | Description |

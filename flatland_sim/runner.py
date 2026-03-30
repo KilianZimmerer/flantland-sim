@@ -196,13 +196,48 @@ class SimulationRunner:
                     is_terminal=False,
                 )
 
-        # Drop leading timesteps where no agent has appeared on the grid yet
-        while timesteps and all(a["position"] is None for a in timesteps[0]["agents"]):
-            timesteps.pop(0)
-
         # Drop the final timestep — next_position and transition_label are unknowable
         # without taking another step, so every label in the returned list is ground truth.
         if timesteps:
             timesteps.pop()
 
+        # Trim to the time range where ALL trains are simultaneously present
+        # on the grid (all departed, none yet DONE).
+        timesteps = self._trim_to_common_presence(timesteps)
+
+        return timesteps
+
+    @staticmethod
+    def _trim_to_common_presence(timesteps: list[dict]) -> list[dict]:
+        """Return the sub-sequence of *timesteps* where every agent is on the
+        grid and none has reached DONE status yet.
+
+        The first valid step is the one where the last agent departs (position
+        becomes non-None).  The last valid step is the one just before the
+        first agent reaches DONE.  If no such window exists the full list is
+        returned unchanged so downstream code still has data to work with.
+        """
+        if not timesteps:
+            return timesteps
+
+        num_agents = len(timesteps[0]["agents"])
+
+        # Find the first step where ALL agents have a non-None position
+        start = None
+        for idx, ts in enumerate(timesteps):
+            if all(a["position"] is not None for a in ts["agents"]):
+                start = idx
+                break
+
+        # Find the first step where ANY agent has status DONE
+        end = len(timesteps)
+        for idx, ts in enumerate(timesteps):
+            if any(a["status"] == "DONE" for a in ts["agents"]):
+                end = idx
+                break
+
+        if start is not None and start < end:
+            return timesteps[start:end]
+
+        # No valid common-presence window — return as-is
         return timesteps
