@@ -491,7 +491,7 @@ class NavigatorApp:
         self._info_text.configure(state=tk.DISABLED)
 
     def _update_info_panel(self) -> None:
-        """Check current timestep for notable conditions and log messages."""
+        """Log a summary of the current timestep and notable conditions."""
         if self._snapshot is None:
             return
 
@@ -502,10 +502,20 @@ class NavigatorApp:
         timestep = self._snapshot.timesteps[idx]
         agents = timestep.get("agents", [])
 
+        # Per-agent summary
+        parts = []
+        for a in agents:
+            aid = a.get("id", "?")
+            trans = a.get("transition_label", -1)
+            label = format_transition_label(trans) if isinstance(trans, int) else "?"
+            parts.append(f"A{aid}:{label}")
+        summary = ", ".join(parts)
+        self._log_message("INFO", f"Agents: [{summary}]")
+
         blocked = [a for a in agents if a.get("transition_label") == 5]
         if blocked:
             ids = ", ".join(str(a.get("id", "?")) for a in blocked)
-            self._log_message("WARNING", f"Blocked agents: {ids}")
+            self._log_message("INFO", f"Blocked agents: {ids}")
 
         ended = [a for a in agents if a.get("transition_label") in (6, 7)]
         if ended:

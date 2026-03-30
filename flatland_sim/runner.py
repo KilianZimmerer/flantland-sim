@@ -130,6 +130,15 @@ class SimulationRunner:
             }
             timesteps.append(record)
 
+            # Log timestep info
+            statuses = [agent.state.name for agent in agents]
+            status_summary = ", ".join(
+                f"A{i}:{s}" for i, s in enumerate(statuses)
+            )
+            logging.info(
+                f"Scenario {self.scenario_id}, step {t}: actions={actions}, statuses=[{status_summary}]"
+            )
+
             # Step the environment
             self.env.step(actions)
 
@@ -164,7 +173,7 @@ class SimulationRunner:
                 if agent.state != TrainState.DONE
             ):
                 deadlock = True
-                logging.warning(
+                logging.info(
                     f"Scenario {self.scenario_id}: global deadlock detected at step {t}, stopping early"
                 )
                 break

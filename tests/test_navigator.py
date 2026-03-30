@@ -1036,13 +1036,13 @@ class TestInfoPanel:
         assert "[Step 3]" in content
 
     def test_update_info_panel_logs_blocked_agents(self):
-        """_update_info_panel should log a WARNING when agents are blocked."""
+        """_update_info_panel should log an INFO when agents are blocked."""
         snap = _make_snapshot_with_rail(num_agents=1, num_timesteps=1)
         snap.timesteps[0]["agents"][0]["transition_label"] = 5  # BLOCKED
         app = self._build_app([snap])
         app._update_info_panel()
         content = app._info_text._content
-        assert "WARNING" in content
+        assert "INFO" in content
         assert "Blocked" in content
 
     def test_update_info_panel_logs_ended_agents(self):
@@ -1055,13 +1055,15 @@ class TestInfoPanel:
         assert "INFO" in content
         assert "reached target" in content
 
-    def test_update_info_panel_no_message_for_normal_step(self):
-        """_update_info_panel should not log anything for a normal FREE_FORWARD step."""
+    def test_update_info_panel_logs_summary_for_normal_step(self):
+        """_update_info_panel should log a timestep summary even for normal steps."""
         snap = _make_snapshot(10, num_timesteps=3)
         app = self._build_app([snap])
         app._update_info_panel()
         content = app._info_text._content
-        assert content == ""
+        assert "INFO" in content
+        assert "Agents:" in content
+        assert "FREE_FORWARD" in content
 
     def test_update_info_panel_no_crash_when_no_snapshot(self):
         """_update_info_panel with no snapshot should be a no-op."""
