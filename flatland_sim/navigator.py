@@ -15,14 +15,11 @@ from flatland_sim.scenario_store import ScenarioStore
 from flatland_sim.snapshot import ScenarioSnapshot
 
 TRANSITION_LABELS: dict[int, str] = {
-    0: "WAITING",
-    1: "INTENTIONAL_STOP",
-    2: "FREE_FORWARD",
-    3: "FREE_LEFT",
-    4: "FREE_RIGHT",
-    5: "BLOCKED",
-    6: "END",
-    7: "DONE",
+    0: "INTENTIONAL_STOP",
+    1: "FREE_FORWARD",
+    2: "FREE_LEFT",
+    3: "FREE_RIGHT",
+    4: "BLOCKED",
 }
 
 
@@ -428,7 +425,7 @@ class NavigatorApp:
 
     # Short abbreviations for transition labels shown on canvas
     _TRANSITION_SHORT: dict[int, str] = {
-        0: "W", 1: "IS", 2: "FF", 3: "FL", 4: "FR", 5: "BL", 6: "E", 7: "D",
+        0: "IS", 1: "FF", 2: "FL", 3: "FR", 4: "BL",
     }
 
     def _render_agents(self) -> None:
@@ -513,13 +510,13 @@ class NavigatorApp:
         self._chart_ax_area = ax_area
 
         label_names = [
-            "waiting", "intentional_stop", "free_forward", "free_left",
-            "free_right", "blocked", "end", "done",
+            "intentional_stop", "free_forward", "free_left",
+            "free_right", "blocked",
         ]
 
         # Bar chart: total transition label counts
         counts = [metrics.get(f"{name}_count", 0) for name in label_names]
-        short_names = ["W", "IS", "FF", "FL", "FR", "BL", "E", "D"]
+        short_names = ["IS", "FF", "FL", "FR", "BL"]
         ax_bar.bar(short_names, counts, color="#4363d8")
         ax_bar.set_title("Transition Counts", fontsize=9)
         ax_bar.set_ylabel("Count", fontsize=8)
@@ -539,19 +536,16 @@ class NavigatorApp:
         steps = list(range(len(snap.timesteps)))
         area_colors = [
             "#3cb44b", "#bfef45", "#4363d8", "#42d4f4",
-            "#f58231", "#e6194b", "#911eb4", "#a9a9a9",
+            "#e6194b",
         ]
         ax_area.stackplot(
             steps,
             per_step_counts["free_forward"],
             per_step_counts["free_left"],
             per_step_counts["free_right"],
-            per_step_counts["waiting"],
             per_step_counts["intentional_stop"],
             per_step_counts["blocked"],
-            per_step_counts["end"],
-            per_step_counts["done"],
-            labels=["FF", "FL", "FR", "W", "IS", "BL", "E", "D"],
+            labels=["FF", "FL", "FR", "IS", "BL"],
             colors=area_colors,
             alpha=0.8,
         )
@@ -657,15 +651,10 @@ class NavigatorApp:
         summary = ", ".join(parts)
         self._log_message("INFO", f"Agents: [{summary}]")
 
-        blocked = [a for a in agents if a.get("transition_label") == 5]
+        blocked = [a for a in agents if a.get("transition_label") == 4]
         if blocked:
             ids = ", ".join(str(a.get("id", "?")) for a in blocked)
             self._log_message("INFO", f"Blocked agents: {ids}")
-
-        ended = [a for a in agents if a.get("transition_label") in (6, 7)]
-        if ended:
-            ids = ", ".join(str(a.get("id", "?")) for a in ended)
-            self._log_message("INFO", f"Agents reached target: {ids}")
 
     # -- public API --
 

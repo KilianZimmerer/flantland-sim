@@ -9,21 +9,15 @@ from tests.strategies import snapshot_strategy
 
 
 # Feature: scenarios-analysis, Property 10: completion_rate formula
-@given(snap=snapshot_strategy())
+@given(snap=snapshot_strategy(), max_steps=st.integers(min_value=1, max_value=100))
 @settings(max_examples=100)
-def test_analyzer_completion_rate(snap):
+def test_analyzer_completion_rate(snap, max_steps):
     """Validates: Requirements 3.1"""
-    analyzer = Analyzer(ScenarioStore([snap]), max_steps=1000)
+    analyzer = Analyzer(ScenarioStore([snap]), max_steps=max_steps)
     metrics = analyzer._analyse_scenario(snap)
 
-    num_agents = snap.num_agents
-    agents_with_end = set()
-    for timestep in snap.timesteps:
-        for agent in timestep["agents"]:
-            if agent["transition_label"] == 6:
-                agents_with_end.add(agent["id"])
-
-    expected = len(agents_with_end) / num_agents if num_agents > 0 else 0.0
+    total_steps = len(snap.timesteps)
+    expected = 1.0 if total_steps < max_steps else 0.0
     assert metrics.completion_rate == expected
     assert 0.0 <= metrics.completion_rate <= 1.0
 
@@ -37,14 +31,11 @@ def test_analyzer_label_counts_sum(snap):
     metrics = analyzer._analyse_scenario(snap)
 
     total = (
-        metrics.waiting_count
-        + metrics.intentional_stop_count
+        metrics.intentional_stop_count
         + metrics.free_forward_count
         + metrics.free_left_count
         + metrics.free_right_count
         + metrics.blocked_count
-        + metrics.end_count
-        + metrics.done_count
     )
     assert total == metrics.total_steps * snap.num_agents
 

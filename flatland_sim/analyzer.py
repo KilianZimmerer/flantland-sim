@@ -13,14 +13,11 @@ class ScenarioMetrics:
     completion_rate: float        # [0.0, 1.0]
     total_steps: int
     deadlock_detected: bool
-    waiting_count: int
     intentional_stop_count: int
     free_forward_count: int
     free_left_count: int
     free_right_count: int
     blocked_count: int
-    end_count: int
-    done_count: int
     avg_blocked_ratio: float      # blocked_count / (total_steps * num_agents) or 0.0
 
 
@@ -56,40 +53,33 @@ class Analyzer:
         num_agents = snap.num_agents
 
         # Per-label counts
-        waiting_count = 0
         intentional_stop_count = 0
         free_forward_count = 0
         free_left_count = 0
         free_right_count = 0
         blocked_count = 0
-        end_count = 0
-        done_count = 0
-
-        # Track which agents have seen at least one END label
-        agents_with_end: set[int] = set()
 
         for timestep in snap.timesteps:
             for agent in timestep["agents"]:
                 label = agent["transition_label"]
                 if label == 0:
-                    waiting_count += 1
-                elif label == 1:
                     intentional_stop_count += 1
-                elif label == 2:
+                elif label == 1:
                     free_forward_count += 1
-                elif label == 3:
+                elif label == 2:
                     free_left_count += 1
-                elif label == 4:
+                elif label == 3:
                     free_right_count += 1
-                elif label == 5:
+                elif label == 4:
                     blocked_count += 1
-                elif label == 6:
-                    end_count += 1
-                    agents_with_end.add(agent["id"])
-                elif label == 7:
-                    done_count += 1
 
-        completion_rate = len(agents_with_end) / num_agents if num_agents > 0 else 0.0
+        # Scenarios now end when any agent reaches destination, so if the
+        # scenario stopped before max_steps without a deadlock the trains
+        # completed successfully.
+        completed_early = total_steps < self._max_steps
+        # A simple heuristic: completion_rate is 1.0 when the scenario ended
+        # before max_steps (train arrived), 0.0 otherwise.
+        completion_rate = 1.0 if completed_early else 0.0
         deadlock_detected = total_steps < self._max_steps and completion_rate < 1.0
 
         denom = total_steps * num_agents
@@ -100,14 +90,11 @@ class Analyzer:
             completion_rate=completion_rate,
             total_steps=total_steps,
             deadlock_detected=deadlock_detected,
-            waiting_count=waiting_count,
             intentional_stop_count=intentional_stop_count,
             free_forward_count=free_forward_count,
             free_left_count=free_left_count,
             free_right_count=free_right_count,
             blocked_count=blocked_count,
-            end_count=end_count,
-            done_count=done_count,
             avg_blocked_ratio=avg_blocked_ratio,
         )
 

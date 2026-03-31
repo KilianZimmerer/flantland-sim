@@ -230,14 +230,11 @@ class TestReset:
 class TestTransitionLabels:
     def test_all_known_labels(self):
         expected = {
-            0: "WAITING",
-            1: "INTENTIONAL_STOP",
-            2: "FREE_FORWARD",
-            3: "FREE_LEFT",
-            4: "FREE_RIGHT",
-            5: "BLOCKED",
-            6: "END",
-            7: "DONE",
+            0: "INTENTIONAL_STOP",
+            1: "FREE_FORWARD",
+            2: "FREE_LEFT",
+            3: "FREE_RIGHT",
+            4: "BLOCKED",
         }
         assert TRANSITION_LABELS == expected
 
@@ -251,8 +248,8 @@ class TestTransitionLabels:
     def test_format_unknown_negative(self):
         assert format_transition_label(-1) == "UNKNOWN(-1)"
 
-    def test_format_unknown_eight(self):
-        assert format_transition_label(8) == "UNKNOWN(8)"
+    def test_format_unknown_five(self):
+        assert format_transition_label(5) == "UNKNOWN(5)"
 
 
 # ── CLI main() ────────────────────────────────────────────────────────────
@@ -335,7 +332,7 @@ def _make_snapshot(scenario_id: int, num_timesteps: int = 3) -> ScenarioSnapshot
         timesteps=[
             {"step": i, "agents": [{"id": 0, "position": (0, i), "direction": 0,
                                      "status": "ACTIVE", "action_taken": 2,
-                                     "next_position": (0, i + 1), "transition_label": 2}]}
+                                     "next_position": (0, i + 1), "transition_label": 1}]}
             for i in range(num_timesteps)
         ],
     )
@@ -491,7 +488,7 @@ def _make_snapshot_with_rail(
                         "status": "ACTIVE",
                         "action_taken": 2,
                         "next_position": (0, min(a + i + 1, width - 1)),
-                        "transition_label": 2,
+                        "transition_label": 1,
                     }
                     for a in range(num_agents)
                 ],
@@ -1038,22 +1035,12 @@ class TestInfoPanel:
     def test_update_info_panel_logs_blocked_agents(self):
         """_update_info_panel should log an INFO when agents are blocked."""
         snap = _make_snapshot_with_rail(num_agents=1, num_timesteps=1)
-        snap.timesteps[0]["agents"][0]["transition_label"] = 5  # BLOCKED
+        snap.timesteps[0]["agents"][0]["transition_label"] = 4  # BLOCKED
         app = self._build_app([snap])
         app._update_info_panel()
         content = app._info_text._content
         assert "INFO" in content
         assert "Blocked" in content
-
-    def test_update_info_panel_logs_ended_agents(self):
-        """_update_info_panel should log INFO when agents reach target."""
-        snap = _make_snapshot_with_rail(num_agents=1, num_timesteps=1)
-        snap.timesteps[0]["agents"][0]["transition_label"] = 6  # END
-        app = self._build_app([snap])
-        app._update_info_panel()
-        content = app._info_text._content
-        assert "INFO" in content
-        assert "reached target" in content
 
     def test_update_info_panel_logs_summary_for_normal_step(self):
         """_update_info_panel should log a timestep summary even for normal steps."""
@@ -1304,16 +1291,13 @@ def test_prop_jump_to_clamps(engine, n):
 @settings(max_examples=100)
 def test_prop_format_transition_label(label):
     result = format_transition_label(label)
-    if 0 <= label <= 7:
+    if 0 <= label <= 4:
         expected_names = {
-            0: "WAITING",
-            1: "INTENTIONAL_STOP",
-            2: "FREE_FORWARD",
-            3: "FREE_LEFT",
-            4: "FREE_RIGHT",
-            5: "BLOCKED",
-            6: "END",
-            7: "DONE",
+            0: "INTENTIONAL_STOP",
+            1: "FREE_FORWARD",
+            2: "FREE_LEFT",
+            3: "FREE_RIGHT",
+            4: "BLOCKED",
         }
         assert result == expected_names[label]
     else:

@@ -6,14 +6,11 @@ from flatland.envs.agent_utils import TrainState
 from PIL import Image
 
 # transition_label constants
-WAITING = 0
-INTENTIONAL_STOP = 1
-FREE_FORWARD = 2
-FREE_LEFT = 3
-FREE_RIGHT = 4
-BLOCKED = 5
-END = 6
-DONE = 7
+INTENTIONAL_STOP = 0
+FREE_FORWARD = 1
+FREE_LEFT = 2
+FREE_RIGHT = 3
+BLOCKED = 4
 
 _DEADLOCK_WINDOW = 5
 
@@ -71,16 +68,8 @@ class SimulationRunner:
             return 0
 
     @staticmethod
-    def _transition_label(action: int, prev_pos, next_pos, cur_status: str, next_status: str, is_terminal: bool) -> int:
+    def _transition_label(action: int, prev_pos, next_pos) -> int:
         """Compute transition_label for one agent based on the physical outcome."""
-        # Already DONE in a previous step — agent is inactive
-        if cur_status == "DONE":
-            return DONE
-        # Transitioning into DONE this step (arrival)
-        if is_terminal or next_status == "DONE":
-            return END
-        if prev_pos is None:
-            return WAITING
         if action == 4 and prev_pos == next_pos:
             return INTENTIONAL_STOP
         if action == 2 and prev_pos != next_pos:
@@ -91,8 +80,8 @@ class SimulationRunner:
             return FREE_RIGHT
         if action in (1, 2, 3) and prev_pos == next_pos:
             return BLOCKED
-        # fallback (e.g. action==0 / DONE)
-        return WAITING
+        # fallback
+        return INTENTIONAL_STOP
 
     def run(self) -> list[dict]:
         timesteps = []
@@ -178,8 +167,11 @@ class SimulationRunner:
                 )
                 break
 
-            # Early stopping: all agents done
-            if all(agent.state == TrainState.DONE for agent in self.env.agents):
+            # Early stopping: any agent reached destination
+            if any(agent.state == TrainState.DONE for agent in self.env.agents):
+                logging.info(
+                    f"Scenario {self.scenario_id}: agent reached destination at step {t}, stopping"
+                )
                 break
 
         # Determine terminal condition for transition_label backfill
@@ -200,9 +192,6 @@ class SimulationRunner:
                     action=agent_record["action_taken"],
                     prev_pos=agent_record["position"],
                     next_pos=nxt_agents[j]["position"],
-                    cur_status=agent_record["status"],
-                    next_status=nxt_agents[j]["status"],
-                    is_terminal=False,
                 )
 
         # Drop the final timestep — next_position and transition_label are unknowable
