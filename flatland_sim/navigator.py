@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import dataclasses
 import sys
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib.figure import Figure
+
+from flatland_sim.analyzer import Analyzer
 from flatland_sim.scenario_store import ScenarioStore
 from flatland_sim.snapshot import ScenarioSnapshot
 
@@ -134,7 +140,7 @@ class NavigatorApp:
         # -- root window --
         self._root = tk.Tk()
         self._root.title("Flatland Scenario Navigator")
-        self._root.geometry("900x650")
+        self._root.geometry("1300x700")
 
         # -- top bar: scenario selector --
         top_frame = ttk.Frame(self._root)
@@ -156,10 +162,25 @@ class NavigatorApp:
         self._status_var = tk.StringVar(value="")
         ttk.Label(top_frame, textvariable=self._status_var).pack(side=tk.RIGHT)
 
-        # -- canvas --
-        self._canvas = tk.Canvas(self._root, bg="white")
-        self._canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # -- main content area: canvas (left) + charts (right) side-by-side --
+        self._main_frame = ttk.Frame(self._root)
+        self._main_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # -- canvas (left side) --
+        self._canvas = tk.Canvas(self._main_frame, bg="white")
+        self._canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self._canvas.bind("<Configure>", self._on_canvas_resize)
+
+        # -- analysis charts panel (right side, matplotlib embedded) --
+        self._chart_frame = ttk.Frame(self._main_frame, width=350)
+        self._chart_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
+        self._chart_frame.pack_propagate(False)
+
+        self._chart_fig: Figure | None = None
+        self._chart_canvas_widget = None  # FigureCanvasTkAgg instance
+        self._chart_vline = None  # vertical line artist on the area chart
+        self._chart_ax_bar = None
+        self._chart_ax_area = None
 
         # -- timeline slider (between canvas and control bar) --
         self._updating_slider = False
@@ -254,6 +275,7 @@ class NavigatorApp:
         self._cell_size = 0.0  # will be computed in _render_static
         self._render_static()
         self._render_agents()
+        self._build_charts()
         self._update_controls()
 
     # -- playback control handlers --
@@ -264,6 +286,7 @@ class NavigatorApp:
         self._render_agents()
         self._update_controls()
         self._update_info_panel()
+        self._update_chart_vline()
         self._start_tick()
 
     def _on_pause(self) -> None:
@@ -272,6 +295,7 @@ class NavigatorApp:
         self._render_agents()
         self._update_controls()
         self._update_info_panel()
+        self._update_chart_vline()
 
     def _on_step_fwd(self) -> None:
         """Step forward one timestep and refresh display."""
@@ -279,6 +303,7 @@ class NavigatorApp:
         self._render_agents()
         self._update_controls()
         self._update_info_panel()
+        self._update_chart_vline()
 
     def _on_step_back(self) -> None:
         """Step backward one timestep and refresh display."""
@@ -286,6 +311,7 @@ class NavigatorApp:
         self._render_agents()
         self._update_controls()
         self._update_info_panel()
+        self._update_chart_vline()
 
     def _on_slider_change(self, value: str) -> None:
         """Handle timeline slider change — jump engine to the selected timestep."""
@@ -295,6 +321,7 @@ class NavigatorApp:
         self._render_agents()
         self._update_controls()
         self._update_info_panel()
+        self._update_chart_vline()
 
     def _on_speed_change(self, value: str) -> None:
         """Handle speed slider change."""
@@ -314,6 +341,7 @@ class NavigatorApp:
             self._render_agents()
             self._update_controls()
             self._update_info_panel()
+            self._update_chart_vline()
         if self._engine.is_playing:
             self._tick_id = self._root.after(self._engine.speed_ms, self._tick)
 
@@ -450,6 +478,123 @@ class NavigatorApp:
         """Full redraw — static grid + agents. Used by tests and initial render."""
         self._render_static()
         self._render_agents()
+
+    def _build_charts(self) -> None:
+        """Compute analysis metrics for the current scenario and render embedded charts."""
+        if self._snapshot is None:
+            return
+
+        snap = self._snapshot
+
+        # Compute metrics via Analyzer
+        single_store = ScenarioStore([snap])
+        analyzer = Analyzer(single_store, max_steps=len(snap.timesteps))
+        report = analyzer.analyse()
+        metrics = report.per_scenario[0] if report.per_scenario else {}
+
+        # Destroy previous chart widget if any
+        if self._chart_canvas_widget is not None:
+            try:
+                self._chart_canvas_widget.get_tk_widget().destroy()
+            except Exception:
+                pass
+            self._chart_canvas_widget = None
+        self._chart_fig = None
+        self._chart_vline = None
+        self._chart_ax_bar = None
+        self._chart_ax_area = None
+
+        # Build matplotlib figure — vertical layout for right-side panel
+        fig = Figure(figsize=(4, 5))
+        ax_bar = fig.add_subplot(2, 1, 1)
+        ax_area = fig.add_subplot(2, 1, 2)
+        self._chart_fig = fig
+        self._chart_ax_bar = ax_bar
+        self._chart_ax_area = ax_area
+
+        label_names = [
+            "waiting", "intentional_stop", "free_forward", "free_left",
+            "free_right", "blocked", "end", "done",
+        ]
+
+        # Bar chart: total transition label counts
+        counts = [metrics.get(f"{name}_count", 0) for name in label_names]
+        short_names = ["W", "IS", "FF", "FL", "FR", "BL", "E", "D"]
+        ax_bar.bar(short_names, counts, color="#4363d8")
+        ax_bar.set_title("Transition Counts", fontsize=9)
+        ax_bar.set_ylabel("Count", fontsize=8)
+        ax_bar.tick_params(labelsize=7)
+
+        # Stacked area chart: agent state composition per timestep
+        per_step_counts = {name: [] for name in label_names}
+        for step in snap.timesteps:
+            step_counts = {name: 0 for name in label_names}
+            for agent in step["agents"]:
+                lbl = agent.get("transition_label")
+                if lbl is not None and 0 <= lbl < len(label_names):
+                    step_counts[label_names[lbl]] += 1
+            for name in label_names:
+                per_step_counts[name].append(step_counts[name])
+
+        steps = list(range(len(snap.timesteps)))
+        area_colors = [
+            "#3cb44b", "#bfef45", "#4363d8", "#42d4f4",
+            "#f58231", "#e6194b", "#911eb4", "#a9a9a9",
+        ]
+        ax_area.stackplot(
+            steps,
+            per_step_counts["free_forward"],
+            per_step_counts["free_left"],
+            per_step_counts["free_right"],
+            per_step_counts["waiting"],
+            per_step_counts["intentional_stop"],
+            per_step_counts["blocked"],
+            per_step_counts["end"],
+            per_step_counts["done"],
+            labels=["FF", "FL", "FR", "W", "IS", "BL", "E", "D"],
+            colors=area_colors,
+            alpha=0.8,
+        )
+        ax_area.set_title("Agent States Over Time", fontsize=9)
+        ax_area.set_xlabel("Step", fontsize=8)
+        ax_area.set_ylabel("Agents", fontsize=8)
+        ax_area.tick_params(labelsize=7)
+        ax_area.legend(loc="upper right", fontsize=6, ncol=4)
+
+        # Add vertical line for current timestep
+        idx = self._engine.current_index
+        self._chart_vline = ax_area.axvline(x=idx, color="black", linewidth=1, linestyle="--")
+
+        # Suptitle with key metrics
+        cr = metrics.get("completion_rate", 0)
+        dl = metrics.get("deadlock_detected", False)
+        fig.suptitle(
+            f"Scenario {snap.scenario_id} | Completion: {cr:.0%} | Deadlock: {dl}",
+            fontsize=9,
+        )
+        fig.tight_layout(rect=[0, 0, 1, 0.92])
+
+        # Embed in tkinter
+        try:
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            self._chart_canvas_widget = FigureCanvasTkAgg(fig, master=self._chart_frame)
+            self._chart_canvas_widget.draw()
+            self._chart_canvas_widget.get_tk_widget().pack(fill="both", expand=True)
+        except Exception:
+            # In test environments with mocked tkinter, embedding may fail — that's OK
+            pass
+
+    def _update_chart_vline(self) -> None:
+        """Move the vertical timestep indicator on the area chart."""
+        if self._chart_vline is None or self._chart_ax_area is None:
+            return
+        idx = self._engine.current_index
+        self._chart_vline.set_xdata([idx, idx])
+        if self._chart_canvas_widget is not None:
+            try:
+                self._chart_canvas_widget.draw_idle()
+            except Exception:
+                pass
 
     def _update_controls(self) -> None:
         """Sync control widgets with engine state."""
