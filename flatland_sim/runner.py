@@ -3,7 +3,6 @@ import logging
 
 from flatland.envs.rail_env import RailEnv
 from flatland.envs.agent_utils import TrainState
-from PIL import Image
 
 # transition_label constants
 INTENTIONAL_STOP = 0
@@ -16,12 +15,10 @@ _DEADLOCK_WINDOW = 5
 
 
 class SimulationRunner:
-    def __init__(self, env: RailEnv, max_steps: int, scenario_id: int = 0, renderer=None):
+    def __init__(self, env: RailEnv, max_steps: int, scenario_id: int = 0):
         self.env = env
         self.max_steps = max_steps
         self.scenario_id = scenario_id
-        self.renderer = renderer
-        self._frames = []
 
     def _get_valid_actions(self, agent_handle: int) -> list[int]:
         """Return the list of Flatland actions (1-4) that lead to a valid
@@ -110,7 +107,7 @@ class SimulationRunner:
                         "position": agent.position,
                         "direction": agent.direction,
                         "status": agent.state.name,
-                        "action_taken": actions[i],
+                        "action_planned": actions[i],
                         "next_position": None,
                         "transition_label": None,
                     }
@@ -130,13 +127,6 @@ class SimulationRunner:
 
             # Step the environment
             self.env.step(actions)
-
-            # Collect frame if renderer is provided
-            if self.renderer is not None:
-                frame = self.renderer.render_env(show=False, return_image=True)
-                if not isinstance(frame, Image.Image):
-                    frame = Image.fromarray(frame)
-                self._frames.append(frame)
 
             # Backfill next_position
             for agent_record in record["agents"]:
@@ -189,7 +179,7 @@ class SimulationRunner:
             nxt_agents = timesteps[idx + 1]["agents"]
             for j, agent_record in enumerate(cur_agents):
                 agent_record["transition_label"] = self._transition_label(
-                    action=agent_record["action_taken"],
+                    action=agent_record["action_planned"],
                     prev_pos=agent_record["position"],
                     next_pos=nxt_agents[j]["position"],
                 )

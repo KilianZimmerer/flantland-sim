@@ -27,7 +27,7 @@ def snapshot_strategy(draw) -> ScenarioSnapshot:
                 "position": None,
                 "direction": 0,
                 "status": "active",
-                "action_taken": 0,
+                "action_planned": 0,
                 "next_position": None,
                 "transition_label": label,
             })

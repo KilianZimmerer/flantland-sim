@@ -428,6 +428,11 @@ class NavigatorApp:
         0: "IS", 1: "FF", 2: "FL", 3: "FR", 4: "BL",
     }
 
+    # Short abbreviations for planned actions shown on canvas
+    _ACTION_SHORT: dict[int, str] = {
+        0: "no", 1: "L", 2: "F", 3: "R", 4: "S",
+    }
+
     def _render_agents(self) -> None:
         """Redraw agent markers and inline labels for the current timestep."""
         self._canvas.delete("agent")
@@ -457,11 +462,8 @@ class NavigatorApp:
                     fill=color, outline="black", width=1, tags="agent",
                 )
 
-                # Inline label: agent id + short transition code
-                trans = agent.get("transition_label", -1)
-                short = self._TRANSITION_SHORT.get(trans, "?")
-                direction = agent.get("direction", "?")
-                label_text = f"A{aid} d{direction} {short}"
+                # Inline label: agent id only
+                label_text = f"A{aid}"
                 font_size = max(7, int(cell * 0.18))
                 self._canvas.create_text(
                     cx, cy - radius - font_size * 0.7,
@@ -630,7 +632,7 @@ class NavigatorApp:
         self._info_text.configure(state=tk.DISABLED)
 
     def _update_info_panel(self) -> None:
-        """Log a summary of the current timestep and notable conditions."""
+        """Log a summary of the current timestep."""
         if self._snapshot is None:
             return
 
@@ -641,20 +643,17 @@ class NavigatorApp:
         timestep = self._snapshot.timesteps[idx]
         agents = timestep.get("agents", [])
 
-        # Per-agent summary
+        # Per-agent summary: action_planned > transition_label
         parts = []
         for a in agents:
             aid = a.get("id", "?")
+            action = a.get("action_planned", -1)
+            act_short = self._ACTION_SHORT.get(action, "?")
             trans = a.get("transition_label", -1)
-            label = format_transition_label(trans) if isinstance(trans, int) else "?"
-            parts.append(f"A{aid}:{label}")
+            trans_short = self._TRANSITION_SHORT.get(trans, "?")
+            parts.append(f"A{aid}:{act_short}>{trans_short}")
         summary = ", ".join(parts)
-        self._log_message("INFO", f"Agents: [{summary}]")
-
-        blocked = [a for a in agents if a.get("transition_label") == 4]
-        if blocked:
-            ids = ", ".join(str(a.get("id", "?")) for a in blocked)
-            self._log_message("INFO", f"Blocked agents: {ids}")
+        self._log_message("INFO", summary)
 
     # -- public API --
 

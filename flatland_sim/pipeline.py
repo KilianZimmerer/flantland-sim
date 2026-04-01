@@ -3,7 +3,6 @@ import yaml
 import dill
 from pathlib import Path
 
-from flatland.utils.rendertools import RenderTool
 from flatland_sim.sampler import RandomConfigSampler
 from flatland_sim.generator import ScenarioGenerator
 from flatland_sim.runner import SimulationRunner
@@ -11,15 +10,13 @@ from flatland_sim.snapshot import ScenarioSnapshot
 
 
 class Pipeline:
-    def __init__(self, config: dict, preview: bool = False):
+    def __init__(self, config: dict):
         self.config = config
         self.num_scenarios = config["num_scenarios"]
         self.max_steps = config["max_steps"]
         simulation_dir = config["simulation_dir"]
         self.pkl_path = Path(simulation_dir) / "scenarios.pkl"
-        self.previews_dir = Path(simulation_dir) / "previews"
         self.sampler = RandomConfigSampler(config)
-        self.preview = preview
 
     def run(self) -> list[ScenarioSnapshot]:
         snapshots = []
@@ -45,8 +42,7 @@ class Pipeline:
                 agent_targets = [tuple(agent.target) for agent in env.agents]
                 agent_initial_positions = [tuple(agent.initial_position) for agent in env.agents]
 
-                renderer = RenderTool(env, gl="PIL") if self.preview else None
-                runner = SimulationRunner(env, self.max_steps, scenario_id=i, renderer=renderer)
+                runner = SimulationRunner(env, self.max_steps, scenario_id=i)
                 timesteps = runner.run()
 
                 snapshot = ScenarioSnapshot(
@@ -64,19 +60,11 @@ class Pipeline:
                 )
                 print(f"Scenario {len(snapshots) + 1}/{self.num_scenarios} complete")
                 snapshots.append(snapshot)
-                preview_frames = runner._frames if self.preview else None
 
             except Exception as e:
                 logging.warning(f"Scenario {i} failed: {e}")
                 skip_count += 1
                 continue
-
-            # Save preview outside try/except so a render failure doesn't skip the snapshot
-            if self.preview and preview_frames is not None:
-                try:
-                    self._save_preview(preview_frames, i)
-                except Exception as e:
-                    logging.warning(f"Scenario {i} preview failed: {e}")
 
         self.pkl_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.pkl_path, "wb") as f:
@@ -85,22 +73,9 @@ class Pipeline:
         print(f"Saved {len(snapshots)} scenarios ({skip_count} skipped) to {self.pkl_path}")
         return snapshots
 
-    def _save_preview(self, frames: list, scenario_id: int) -> None:
-        self.previews_dir.mkdir(parents=True, exist_ok=True)
-        gif_path = self.previews_dir / f"scenario_{scenario_id}.gif"
-        if frames:
-            frames[0].save(
-                gif_path,
-                save_all=True,
-                append_images=frames[1:],
-                duration=100,
-                loop=0,
-            )
-        print(f"Saved preview to {self.previews_dir}/scenario_{scenario_id}.gif")
 
-
-def generate_scenarios(config: dict | str, preview: bool = False) -> list[ScenarioSnapshot]:
+def generate_scenarios(config: dict | str) -> list[ScenarioSnapshot]:
     if isinstance(config, str):
         with open(config, "r") as f:
             config = yaml.safe_load(f)
-    return Pipeline(config, preview).run()
+    return Pipeline(config).run()

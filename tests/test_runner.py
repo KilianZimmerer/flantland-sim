@@ -8,7 +8,7 @@ from flatland_sim.generator import ScenarioGenerator
 from flatland_sim.runner import SimulationRunner
 
 REQUIRED_TIMESTEP_KEYS = {"step", "agents"}
-REQUIRED_AGENT_KEYS = {"id", "position", "direction", "status", "action_taken", "next_position"}
+REQUIRED_AGENT_KEYS = {"id", "position", "direction", "status", "action_planned", "next_position"}
 
 MOVING_STOPPED_STATUSES = {"MOVING", "STOPPED"}
 WAITING_DEPART_STATUSES = {"WAITING", "READY_TO_DEPART"}
@@ -41,7 +41,7 @@ def test_p6_action_policy_correctness(seed):
     for ts in timesteps:
         for agent in ts["agents"]:
             status = agent["status"]
-            action = agent["action_taken"]
+            action = agent["action_planned"]
             if status in MOVING_STOPPED_STATUSES:
                 assert action in {1, 2, 3, 4}, (
                     f"Status {status}: expected action in {{1,2,3,4}}, got {action}"

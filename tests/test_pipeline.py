@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import os
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import dill
 import numpy as np
-import pytest
 import yaml
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -159,7 +157,6 @@ def test_p13_skip_failures(total, num_failures, tmp_path):
         MockGen.return_value.build.side_effect = build_side_effect
         mock_runner_instance = MockRunner.return_value
         mock_runner_instance.run.return_value = []
-        mock_runner_instance._frames = []
 
         result = Pipeline(config).run()
 
@@ -185,7 +182,6 @@ def test_p14_serialization_round_trip(seed, tmp_path):
         MockGen.return_value.build.side_effect = build_side_effect
         mock_runner_instance = MockRunner.return_value
         mock_runner_instance.run.return_value = []
-        mock_runner_instance._frames = []
 
         returned = Pipeline(config).run()
 
@@ -230,7 +226,6 @@ def test_parent_dir_creation(tmp_path):
         MockGen.return_value.build.side_effect = build_side_effect
         mock_runner_instance = MockRunner.return_value
         mock_runner_instance.run.return_value = []
-        mock_runner_instance._frames = []
 
         Pipeline(config).run()
 
@@ -242,7 +237,7 @@ def test_parent_dir_creation(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_pipeline_output_paths(tmp_path):
-    """scenarios.pkl lands at {simulation_dir}/scenarios.pkl and GIFs at {simulation_dir}/previews/."""
+    """scenarios.pkl lands at {simulation_dir}/scenarios.pkl."""
     sim_dir = str(tmp_path / "sim_output")
     config = make_config(sim_dir, num_scenarios=1)
 
@@ -254,12 +249,10 @@ def test_pipeline_output_paths(tmp_path):
         MockGen.return_value.build.side_effect = build_side_effect
         mock_runner_instance = MockRunner.return_value
         mock_runner_instance.run.return_value = []
-        mock_runner_instance._frames = []
 
         pipeline = Pipeline(config)
 
     assert pipeline.pkl_path == Path(sim_dir) / "scenarios.pkl"
-    assert pipeline.previews_dir == Path(sim_dir) / "previews"
 
 
 # ---------------------------------------------------------------------------
@@ -276,13 +269,9 @@ def test_p1_output_path_derivation(sim_dir, tmp_path):
     pipeline.config = config
     pipeline.num_scenarios = config["num_scenarios"]
     pipeline.max_steps = config["max_steps"]
-    pipeline.previews_dir = Path(sim_dir) / "previews"
     pipeline.pkl_path = Path(sim_dir) / "scenarios.pkl"
-    pipeline.preview = False
     pipeline.sampler = MagicMock()
 
     sim_path = Path(sim_dir)
     assert pipeline.pkl_path.parts[:len(sim_path.parts)] == sim_path.parts
-    assert pipeline.previews_dir.parts[:len(sim_path.parts)] == sim_path.parts
     assert "output_path" not in config
-    assert "preview_output_dir" not in config

@@ -331,7 +331,7 @@ def _make_snapshot(scenario_id: int, num_timesteps: int = 3) -> ScenarioSnapshot
         agent_initial_positions=[(0, 0)],
         timesteps=[
             {"step": i, "agents": [{"id": 0, "position": (0, i), "direction": 0,
-                                     "status": "ACTIVE", "action_taken": 2,
+                                     "status": "ACTIVE", "action_planned": 2,
                                      "next_position": (0, i + 1), "transition_label": 1}]}
             for i in range(num_timesteps)
         ],
@@ -486,7 +486,7 @@ def _make_snapshot_with_rail(
                         "position": (0, min(a + i, width - 1)),
                         "direction": 0,
                         "status": "ACTIVE",
-                        "action_taken": 2,
+                        "action_planned": 2,
                         "next_position": (0, min(a + i + 1, width - 1)),
                         "transition_label": 1,
                     }
@@ -1040,7 +1040,7 @@ class TestInfoPanel:
         app._update_info_panel()
         content = app._info_text._content
         assert "INFO" in content
-        assert "Blocked" in content
+        assert "BL" in content
 
     def test_update_info_panel_logs_summary_for_normal_step(self):
         """_update_info_panel should log a timestep summary even for normal steps."""
@@ -1049,8 +1049,8 @@ class TestInfoPanel:
         app._update_info_panel()
         content = app._info_text._content
         assert "INFO" in content
-        assert "Agents:" in content
-        assert "FREE_FORWARD" in content
+        assert "A0:" in content
+        assert "FF" in content
 
     def test_update_info_panel_no_crash_when_no_snapshot(self):
         """_update_info_panel with no snapshot should be a no-op."""
