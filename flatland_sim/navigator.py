@@ -511,51 +511,69 @@ class NavigatorApp:
         self._chart_ax_bar = ax_bar
         self._chart_ax_area = ax_area
 
-        label_names = [
-            "intentional_stop", "free_forward", "free_left",
-            "free_right", "blocked",
-        ]
+        # Collect action>transition combo counts (total and per-step)
+        act_short = self._ACTION_SHORT
+        trans_short = self._TRANSITION_SHORT
+        total_combo_counts: dict[str, int] = {}
+        per_step_combo_counts: dict[str, list[int]] = {}
+        num_steps = len(snap.timesteps)
 
-        # Bar chart: total transition label counts
-        counts = [metrics.get(f"{name}_count", 0) for name in label_names]
-        short_names = ["IS", "FF", "FL", "FR", "BL"]
-        ax_bar.bar(short_names, counts, color="#4363d8")
-        ax_bar.set_title("Transition Counts", fontsize=9)
-        ax_bar.set_ylabel("Count", fontsize=8)
-        ax_bar.tick_params(labelsize=7)
-
-        # Stacked area chart: agent state composition per timestep
-        per_step_counts = {name: [] for name in label_names}
         for step in snap.timesteps:
-            step_counts = {name: 0 for name in label_names}
+            step_counts: dict[str, int] = {}
             for agent in step["agents"]:
-                lbl = agent.get("transition_label")
-                if lbl is not None and 0 <= lbl < len(label_names):
-                    step_counts[label_names[lbl]] += 1
-            for name in label_names:
-                per_step_counts[name].append(step_counts[name])
+                a = agent.get("action_planned", -1)
+                t = agent.get("transition_label", -1)
+                key = f"{act_short.get(a, '?')}>{trans_short.get(t, '?')}"
+                step_counts[key] = step_counts.get(key, 0) + 1
+                total_combo_counts[key] = total_combo_counts.get(key, 0) + 1
+            for key in per_step_combo_counts:
+                per_step_combo_counts[key].append(step_counts.get(key, 0))
+            for key in step_counts:
+                if key not in per_step_combo_counts:
+                    per_step_combo_counts[key] = [0] * (len(per_step_combo_counts.get(key, [])) or
+                                                        (len(snap.timesteps) - num_steps + len(per_step_combo_counts.get(key, []))))
 
-        steps = list(range(len(snap.timesteps)))
-        area_colors = [
-            "#3cb44b", "#bfef45", "#4363d8", "#42d4f4",
-            "#e6194b",
+        # Rebuild per_step lists with correct length
+        combo_keys = sorted(total_combo_counts, key=lambda k: -total_combo_counts[k])
+        per_step: dict[str, list[int]] = {k: [] for k in combo_keys}
+        for step in snap.timesteps:
+            step_counts = {}
+            for agent in step["agents"]:
+                a = agent.get("action_planned", -1)
+                t = agent.get("transition_label", -1)
+                key = f"{act_short.get(a, '?')}>{trans_short.get(t, '?')}"
+                step_counts[key] = step_counts.get(key, 0) + 1
+            for k in combo_keys:
+                per_step[k].append(step_counts.get(k, 0))
+
+        # Color palette for combos
+        _combo_colors = [
+            "#3cb44b", "#bfef45", "#4363d8", "#42d4f4", "#e6194b",
+            "#f58231", "#911eb4", "#46f0f0", "#f032e6", "#bcf60c",
+            "#fabebe", "#008080", "#e6beff", "#9a6324", "#800000",
         ]
+
+        # Bar chart: total combo counts
+        bar_colors = [_combo_colors[i % len(_combo_colors)] for i in range(len(combo_keys))]
+        ax_bar.bar(combo_keys, [total_combo_counts[k] for k in combo_keys], color=bar_colors)
+        ax_bar.set_title("Action>Transition Counts", fontsize=9)
+        ax_bar.set_ylabel("Count", fontsize=8)
+        ax_bar.tick_params(labelsize=6, axis="x", rotation=45)
+
+        # Stacked area chart: combo composition per timestep
+        steps = list(range(len(snap.timesteps)))
         ax_area.stackplot(
             steps,
-            per_step_counts["free_forward"],
-            per_step_counts["free_left"],
-            per_step_counts["free_right"],
-            per_step_counts["intentional_stop"],
-            per_step_counts["blocked"],
-            labels=["FF", "FL", "FR", "IS", "BL"],
-            colors=area_colors,
+            *[per_step[k] for k in combo_keys],
+            labels=combo_keys,
+            colors=bar_colors,
             alpha=0.8,
         )
-        ax_area.set_title("Agent States Over Time", fontsize=9)
+        ax_area.set_title("Action>Transition Over Time", fontsize=9)
         ax_area.set_xlabel("Step", fontsize=8)
         ax_area.set_ylabel("Agents", fontsize=8)
         ax_area.tick_params(labelsize=7)
-        ax_area.legend(loc="upper right", fontsize=6, ncol=4)
+        ax_area.legend(loc="upper right", fontsize=5, ncol=3)
 
         # Add vertical line for current timestep
         idx = self._engine.current_index
