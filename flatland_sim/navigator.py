@@ -498,51 +498,40 @@ class NavigatorApp:
         self._chart_ax_bar = ax_bar
         self._chart_ax_area = ax_area
 
-        # Collect action>transition combo counts (total and per-step)
+        # Fixed action>transition combos with stable colors
+        _COMBO_KEYS = ["S>IS", "F>FF", "L>FL", "R>FR", "F>BL", "L>BL", "R>BL"]
+        _COMBO_COLORS = {
+            "S>IS": "#3cb44b",
+            "F>FF": "#4363d8",
+            "L>FL": "#42d4f4",
+            "R>FR": "#f58231",
+            "F>BL": "#e6194b",
+            "L>BL": "#911eb4",
+            "R>BL": "#800000",
+        }
+
         act_short = self._ACTION_SHORT
         trans_short = self._TRANSITION_SHORT
-        total_combo_counts: dict[str, int] = {}
-        per_step_combo_counts: dict[str, list[int]] = {}
-        num_steps = len(snap.timesteps)
 
+        # Count totals and per-step
+        total_counts = {k: 0 for k in _COMBO_KEYS}
+        per_step: dict[str, list[int]] = {k: [] for k in _COMBO_KEYS}
         for step in snap.timesteps:
-            step_counts: dict[str, int] = {}
+            step_counts = {k: 0 for k in _COMBO_KEYS}
             for agent in step["agents"]:
                 a = agent.get("action_planned", -1)
                 t = agent.get("transition_label", -1)
                 key = f"{act_short.get(a, '?')}>{trans_short.get(t, '?')}"
-                step_counts[key] = step_counts.get(key, 0) + 1
-                total_combo_counts[key] = total_combo_counts.get(key, 0) + 1
-            for key in per_step_combo_counts:
-                per_step_combo_counts[key].append(step_counts.get(key, 0))
-            for key in step_counts:
-                if key not in per_step_combo_counts:
-                    per_step_combo_counts[key] = [0] * (len(per_step_combo_counts.get(key, [])) or
-                                                        (len(snap.timesteps) - num_steps + len(per_step_combo_counts.get(key, []))))
+                if key in step_counts:
+                    step_counts[key] += 1
+                    total_counts[key] += 1
+            for k in _COMBO_KEYS:
+                per_step[k].append(step_counts[k])
 
-        # Rebuild per_step lists with correct length
-        combo_keys = sorted(total_combo_counts, key=lambda k: -total_combo_counts[k])
-        per_step: dict[str, list[int]] = {k: [] for k in combo_keys}
-        for step in snap.timesteps:
-            step_counts = {}
-            for agent in step["agents"]:
-                a = agent.get("action_planned", -1)
-                t = agent.get("transition_label", -1)
-                key = f"{act_short.get(a, '?')}>{trans_short.get(t, '?')}"
-                step_counts[key] = step_counts.get(key, 0) + 1
-            for k in combo_keys:
-                per_step[k].append(step_counts.get(k, 0))
-
-        # Color palette for combos
-        _combo_colors = [
-            "#3cb44b", "#bfef45", "#4363d8", "#42d4f4", "#e6194b",
-            "#f58231", "#911eb4", "#46f0f0", "#f032e6", "#bcf60c",
-            "#fabebe", "#008080", "#e6beff", "#9a6324", "#800000",
-        ]
+        colors = [_COMBO_COLORS[k] for k in _COMBO_KEYS]
 
         # Bar chart: total combo counts
-        bar_colors = [_combo_colors[i % len(_combo_colors)] for i in range(len(combo_keys))]
-        ax_bar.bar(combo_keys, [total_combo_counts[k] for k in combo_keys], color=bar_colors)
+        ax_bar.bar(_COMBO_KEYS, [total_counts[k] for k in _COMBO_KEYS], color=colors)
         ax_bar.set_title("Action>Transition Counts", fontsize=9)
         ax_bar.set_ylabel("Count", fontsize=8)
         ax_bar.tick_params(labelsize=6, axis="x", rotation=45)
@@ -551,9 +540,9 @@ class NavigatorApp:
         steps = list(range(len(snap.timesteps)))
         ax_area.stackplot(
             steps,
-            *[per_step[k] for k in combo_keys],
-            labels=combo_keys,
-            colors=bar_colors,
+            *[per_step[k] for k in _COMBO_KEYS],
+            labels=_COMBO_KEYS,
+            colors=colors,
             alpha=0.8,
         )
         ax_area.set_title("Action>Transition Over Time", fontsize=9)
