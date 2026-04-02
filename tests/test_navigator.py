@@ -1,8 +1,8 @@
-"""Tests for PlaybackEngine (Task 1) and transition label formatter (Task 2)."""
+"""Tests for PlaybackEngine and NavigatorApp."""
 
 import pytest
 
-from flatland_sim.navigator import PlaybackEngine, TRANSITION_LABELS, format_transition_label
+from flatland_sim.navigator import PlaybackEngine
 
 
 # ── __init__ ──────────────────────────────────────────────────────────────
@@ -223,33 +223,6 @@ class TestReset:
         engine.reset(0)
         assert engine.current_index == 0
         assert engine.total_steps == 0
-
-
-# ── TRANSITION_LABELS & format_transition_label ───────────────────────────
-
-class TestTransitionLabels:
-    def test_all_known_labels(self):
-        expected = {
-            0: "INTENTIONAL_STOP",
-            1: "FREE_FORWARD",
-            2: "FREE_LEFT",
-            3: "FREE_RIGHT",
-            4: "BLOCKED",
-        }
-        assert TRANSITION_LABELS == expected
-
-    def test_format_known_labels(self):
-        for label_int, name in TRANSITION_LABELS.items():
-            assert format_transition_label(label_int) == name
-
-    def test_format_unknown_positive(self):
-        assert format_transition_label(99) == "UNKNOWN(99)"
-
-    def test_format_unknown_negative(self):
-        assert format_transition_label(-1) == "UNKNOWN(-1)"
-
-    def test_format_unknown_five(self):
-        assert format_transition_label(5) == "UNKNOWN(5)"
 
 
 # ── CLI main() ────────────────────────────────────────────────────────────
@@ -1081,7 +1054,7 @@ import tempfile
 from hypothesis import given, settings, assume
 from hypothesis import strategies as st
 
-from flatland_sim.navigator import PlaybackEngine, format_transition_label, TRANSITION_LABELS
+from flatland_sim.navigator import PlaybackEngine
 from flatland_sim.scenario_store import ScenarioStore
 from flatland_sim.snapshot import ScenarioSnapshot
 
@@ -1281,27 +1254,6 @@ def test_prop_jump_to_clamps(engine, n):
     engine.jump_to(n)
     expected = max(0, min(total - 1, n))
     assert engine.current_index == expected
-
-
-# ── Property 11: format_transition_label returns correct name for 0–7, fallback for others
-# Feature: scenario-time-navigator, Property 11: Transition label formatting round-trip
-# **Validates: Requirements 7.3**
-
-@given(label=st.integers(min_value=-1000, max_value=1000))
-@settings(max_examples=100)
-def test_prop_format_transition_label(label):
-    result = format_transition_label(label)
-    if 0 <= label <= 4:
-        expected_names = {
-            0: "INTENTIONAL_STOP",
-            1: "FREE_FORWARD",
-            2: "FREE_LEFT",
-            3: "FREE_RIGHT",
-            4: "BLOCKED",
-        }
-        assert result == expected_names[label]
-    else:
-        assert result == f"UNKNOWN({label})"
 
 
 # ══════════════════════════════════════════════════════════════════════════

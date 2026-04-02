@@ -14,19 +14,6 @@ from flatland_sim.analyzer import Analyzer
 from flatland_sim.scenario_store import ScenarioStore
 from flatland_sim.snapshot import ScenarioSnapshot
 
-TRANSITION_LABELS: dict[int, str] = {
-    0: "INTENTIONAL_STOP",
-    1: "FREE_FORWARD",
-    2: "FREE_LEFT",
-    3: "FREE_RIGHT",
-    4: "BLOCKED",
-}
-
-
-def format_transition_label(label: int) -> str:
-    """Return human-readable name for a transition label integer."""
-    return TRANSITION_LABELS.get(label, f"UNKNOWN({label})")
-
 
 class PlaybackEngine:
     """Manages playback state (current index, play/pause, speed) independently of GUI."""
