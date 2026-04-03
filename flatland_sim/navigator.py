@@ -10,7 +10,6 @@ import matplotlib
 matplotlib.use("Agg")
 from matplotlib.figure import Figure
 
-from flatland_sim.analyzer import Analyzer
 from flatland_sim.scenario_store import ScenarioStore
 from flatland_sim.snapshot import ScenarioSnapshot
 
@@ -466,17 +465,11 @@ class NavigatorApp:
         self._render_agents()
 
     def _build_charts(self) -> None:
-        """Compute analysis metrics for the current scenario and render embedded charts."""
+        """Render embedded charts for the current scenario."""
         if self._snapshot is None:
             return
 
         snap = self._snapshot
-
-        # Compute metrics via Analyzer
-        single_store = ScenarioStore([snap])
-        analyzer = Analyzer(single_store, max_steps=len(snap.timesteps))
-        report = analyzer.analyse()
-        metrics = report.per_scenario[0] if report.per_scenario else {}
 
         # Destroy previous chart widget if any
         if self._chart_canvas_widget is not None:
@@ -555,14 +548,7 @@ class NavigatorApp:
         idx = self._engine.current_index
         self._chart_vline = ax_area.axvline(x=idx, color="black", linewidth=1, linestyle="--")
 
-        # Suptitle with key metrics
-        cr = metrics.get("completion_rate", 0)
-        dl = metrics.get("deadlock_detected", False)
-        fig.suptitle(
-            f"Scenario {snap.scenario_id} | Completion: {cr:.0%} | Deadlock: {dl}",
-            fontsize=9,
-        )
-        fig.tight_layout(rect=[0, 0, 1, 0.92])
+        fig.tight_layout()
 
         # Embed in tkinter
         try:
