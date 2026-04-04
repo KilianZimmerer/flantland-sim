@@ -128,7 +128,6 @@ flatland-sim/
 │   ├── runner.py
 │   ├── snapshot.py
 │   ├── scenario_store.py
-│   ├── analyzer.py
 │   └── navigator.py
 └── tests/
     ├── strategies.py
@@ -138,7 +137,6 @@ flatland-sim/
     ├── test_snapshot.py
     ├── test_pipeline.py
     ├── test_scenario_store.py
-    ├── test_analyzer.py
     ├── test_navigator.py
     └── test_cli.py
 ```
