@@ -14,11 +14,23 @@ BLOCKED = 4
 _DEADLOCK_WINDOW = 5
 
 
+_ACTION_NAME_TO_ID = {"left": 1, "forward": 2, "right": 3, "stop": 4}
+
+
 class SimulationRunner:
-    def __init__(self, env: RailEnv, max_steps: int, scenario_id: int = 0):
+    def __init__(self, env: RailEnv, max_steps: int, scenario_id: int = 0,
+                 action_weights: dict[str, float] | None = None):
         self.env = env
         self.max_steps = max_steps
         self.scenario_id = scenario_id
+        # Map action *id* → weight.  None means uniform random.
+        self._action_weights: dict[int, float] | None = None
+        if action_weights:
+            self._action_weights = {
+                _ACTION_NAME_TO_ID[name]: w
+                for name, w in action_weights.items()
+                if name in _ACTION_NAME_TO_ID
+            }
 
     def _get_valid_actions(self, agent_handle: int) -> list[int]:
         """Return the list of Flatland actions (1-4) that lead to a valid
@@ -58,6 +70,9 @@ class SimulationRunner:
     def _get_action(self, agent_handle: int, state: TrainState) -> int:
         if state in (TrainState.MOVING, TrainState.STOPPED):
             valid = self._get_valid_actions(agent_handle)
+            if self._action_weights is not None:
+                weights = [self._action_weights.get(a, 1.0) for a in valid]
+                return random.choices(valid, weights=weights, k=1)[0]
             return random.choice(valid)
         elif state in (TrainState.WAITING, TrainState.READY_TO_DEPART):
             return 2

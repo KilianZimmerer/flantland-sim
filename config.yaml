@@ -22,3 +22,13 @@ randomization:
   max_rail_pairs_in_city:
     min: 1
     max: 3
+
+# Weights controlling the distribution of planned actions for MOVING/STOPPED agents.
+# Only valid actions (determined by rail topology) are considered at each step;
+# their weights are extracted from this map and normalised on the fly.
+# Omit or leave empty for uniform random selection.
+action_weights:
+  left: 1.0       # action 1
+  forward: 1.0    # action 2
+  right: 1.0      # action 3
+  stop: 1.0       # action 4

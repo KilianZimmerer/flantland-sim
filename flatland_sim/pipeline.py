@@ -42,7 +42,10 @@ class Pipeline:
                 agent_targets = [tuple(agent.target) for agent in env.agents]
                 agent_initial_positions = [tuple(agent.initial_position) for agent in env.agents]
 
-                runner = SimulationRunner(env, self.max_steps, scenario_id=i)
+                runner = SimulationRunner(
+                    env, self.max_steps, scenario_id=i,
+                    action_weights=self.config.get("action_weights"),
+                )
                 timesteps = runner.run()
 
                 snapshot = ScenarioSnapshot(
