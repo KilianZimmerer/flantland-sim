@@ -1,5 +1,5 @@
 seed: 42
-num_scenarios: 5
+num_scenarios: 20
 max_steps: 500
 simulation_dir: "output/tst"
 
@@ -28,7 +28,7 @@ randomization:
 # their weights are extracted from this map and normalised on the fly.
 # Omit or leave empty for uniform random selection.
 action_weights:
-  left: 1.0       # action 1
-  forward: 1.0    # action 2
-  right: 1.0      # action 3
-  stop: 1.0       # action 4
+  left: 5.0       # action 1
+  forward: 1      # action 2
+  right: 5.0      # action 3
+  stop: 0.2       # action 4

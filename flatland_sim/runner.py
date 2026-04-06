@@ -4,17 +4,24 @@ import logging
 from flatland.envs.rail_env import RailEnv
 from flatland.envs.agent_utils import TrainState
 
-# transition_label constants
-INTENTIONAL_STOP = 0
-FREE_FORWARD = 1
-FREE_LEFT = 2
-FREE_RIGHT = 3
-BLOCKED = 4
+from flatland_sim.schema import Action, TransitionLabel, AgentStatus
+
+# Keep module-level aliases so any external code that imported them still works.
+INTENTIONAL_STOP = TransitionLabel.INTENTIONAL_STOP
+FREE_FORWARD = TransitionLabel.FREE_FORWARD
+FREE_LEFT = TransitionLabel.FREE_LEFT
+FREE_RIGHT = TransitionLabel.FREE_RIGHT
+BLOCKED = TransitionLabel.BLOCKED
 
 _DEADLOCK_WINDOW = 5
 
 
-_ACTION_NAME_TO_ID = {"left": 1, "forward": 2, "right": 3, "stop": 4}
+_ACTION_NAME_TO_ID = {
+    "left": Action.LEFT,
+    "forward": Action.FORWARD,
+    "right": Action.RIGHT,
+    "stop": Action.STOP,
+}
 
 
 class SimulationRunner:
@@ -40,7 +47,7 @@ class SimulationRunner:
         """
         agent = self.env.agents[agent_handle]
         if agent.position is None:
-            return [2]  # not on grid yet – only forward/depart makes sense
+            return [Action.FORWARD]  # not on grid yet – only forward/depart makes sense
 
         row, col = agent.position
         direction = agent.direction
@@ -52,9 +59,9 @@ class SimulationRunner:
         #   fwd   (2) → direction
         #   right (3) → (direction + 1) % 4
         action_to_new_dir = {
-            1: (direction - 1) % 4,
-            2: direction,
-            3: (direction + 1) % 4,
+            Action.LEFT: (direction - 1) % 4,
+            Action.FORWARD: direction,
+            Action.RIGHT: (direction + 1) % 4,
         }
 
         valid = []
@@ -63,8 +70,8 @@ class SimulationRunner:
             if (transition_map >> ((3 - direction) * 4 + (3 - new_dir))) & 1:
                 valid.append(action)
 
-        # Stop (4) is always a legal action for a moving/stopped agent
-        valid.append(4)
+        # Stop is always a legal action for a moving/stopped agent
+        valid.append(Action.STOP)
         return valid
 
     def _get_action(self, agent_handle: int, state: TrainState) -> int:
@@ -75,25 +82,25 @@ class SimulationRunner:
                 return random.choices(valid, weights=weights, k=1)[0]
             return random.choice(valid)
         elif state in (TrainState.WAITING, TrainState.READY_TO_DEPART):
-            return 2
+            return Action.FORWARD
         else:  # TrainState.DONE
-            return 0
+            return Action.NOOP
 
     @staticmethod
     def _transition_label(action: int, prev_pos, next_pos) -> int:
         """Compute transition_label for one agent based on the physical outcome."""
-        if action == 4 and prev_pos == next_pos:
-            return INTENTIONAL_STOP
-        if action == 2 and prev_pos != next_pos:
-            return FREE_FORWARD
-        if action == 1 and prev_pos != next_pos:
-            return FREE_LEFT
-        if action == 3 and prev_pos != next_pos:
-            return FREE_RIGHT
-        if action in (1, 2, 3) and prev_pos == next_pos:
-            return BLOCKED
+        if action == Action.STOP and prev_pos == next_pos:
+            return TransitionLabel.INTENTIONAL_STOP
+        if action == Action.FORWARD and prev_pos != next_pos:
+            return TransitionLabel.FREE_FORWARD
+        if action == Action.LEFT and prev_pos != next_pos:
+            return TransitionLabel.FREE_LEFT
+        if action == Action.RIGHT and prev_pos != next_pos:
+            return TransitionLabel.FREE_RIGHT
+        if action in (Action.LEFT, Action.FORWARD, Action.RIGHT) and prev_pos == next_pos:
+            return TransitionLabel.BLOCKED
         # fallback
-        return INTENTIONAL_STOP
+        return TransitionLabel.INTENTIONAL_STOP
 
     def run(self) -> list[dict]:
         timesteps = []
@@ -235,7 +242,7 @@ class SimulationRunner:
         # Find the first step where ANY agent has status DONE
         end = len(timesteps)
         for idx, ts in enumerate(timesteps):
-            if any(a["status"] == "DONE" for a in ts["agents"]):
+            if any(a["status"] == AgentStatus.DONE for a in ts["agents"]):
                 end = idx
                 break
 
