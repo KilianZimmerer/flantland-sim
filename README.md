@@ -31,16 +31,32 @@ The navigator renders the rail grid on a canvas and lets you step through timest
 ### Python API
 
 ```python
-from flatland_sim.pipeline import Pipeline
-import yaml
+from flatland_sim import generate_scenarios
 
-with open("config.yaml") as f:
-    config = yaml.safe_load(f)
-
-snapshots = Pipeline(config).run()
+snapshots = generate_scenarios("config.yaml")
 ```
 
 Returns a `list[ScenarioSnapshot]`.
+
+### Use as a dependency
+
+Install `flatland-sim` in another project:
+
+```bash
+# from a git remote
+uv add "flatland-sim @ git+https://github.com/youruser/flatland-sim.git"
+
+# or from a local checkout
+uv add --editable ../flatland-sim
+```
+
+Then generate scenarios programmatically:
+
+```python
+from flatland_sim import generate_scenarios
+
+snapshots = generate_scenarios("path/to/config.yaml")
+```
 
 ## Configuration
 
@@ -126,6 +142,7 @@ flatland-sim/
 │   ├── sampler.py
 │   ├── generator.py
 │   ├── runner.py
+│   ├── schema.py
 │   ├── snapshot.py
 │   ├── scenario_store.py
 │   └── navigator.py
