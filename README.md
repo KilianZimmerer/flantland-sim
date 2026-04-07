@@ -53,9 +53,13 @@ uv add --editable ../flatland-sim
 Then generate scenarios programmatically:
 
 ```python
-from flatland_sim import generate_scenarios
+from flatland_sim import generate_scenarios, load_scenarios
 
+# generate
 snapshots = generate_scenarios("path/to/config.yaml")
+
+# load an existing file
+snapshots = load_scenarios("output/tst/scenarios.pkl")
 ```
 
 ## Configuration
@@ -123,10 +127,9 @@ Transition label values:
 Load the output file directly with:
 
 ```python
-import dill
+from flatland_sim import load_scenarios
 
-with open("output/scenarios.pkl", "rb") as f:
-    snapshots = dill.load(f)
+snapshots = load_scenarios("output/scenarios.pkl")
 ```
 
 ## Project Structure
