@@ -23,6 +23,12 @@ uv run python run.py --config config.yaml
 Launch the interactive GUI to browse and replay scenarios from an existing `.pkl` file:
 
 ```bash
+flatland-navigator output/scenarios.pkl
+```
+
+Or equivalently:
+
+```bash
 uv run python -m flatland_sim.navigator output/scenarios.pkl
 ```
 

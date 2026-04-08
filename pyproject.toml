@@ -16,6 +16,9 @@ dependencies = [
     "matplotlib>=3.10.8",
 ]
 
+[project.scripts]
+flatland-navigator = "flatland_sim.navigator:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["flatland_sim"]
 
