@@ -249,5 +249,6 @@ class SimulationRunner:
         if start is not None and start < end:
             return timesteps[start:end]
 
-        # No valid common-presence window — return as-is
-        return timesteps
+        # No valid common-presence window — return empty so callers can
+        # detect the scenario as invalid and discard / retry.
+        return []

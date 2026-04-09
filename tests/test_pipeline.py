@@ -110,7 +110,7 @@ def test_p1_config_equivalence(seed, tmp_path):
 # Property 12: Pipeline attempt count
 # ---------------------------------------------------------------------------
 
-# Feature: flatland-sim, Property 12: Pipeline makes exactly num_scenarios attempts
+# Feature: flatland-sim, Property 12: Pipeline retries each scenario up to max attempts
 @settings(max_examples=20, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(num_scenarios=st.integers(min_value=1, max_value=5))
 def test_p12_attempt_count(num_scenarios, tmp_path):
@@ -124,9 +124,10 @@ def test_p12_attempt_count(num_scenarios, tmp_path):
 
     with patch("flatland_sim.pipeline.ScenarioGenerator") as MockGen:
         MockGen.return_value.build.side_effect = counting_build
+        from flatland_sim.pipeline import _MAX_RETRIES
         Pipeline(config).run()
 
-    assert call_count["n"] == num_scenarios
+    assert call_count["n"] == num_scenarios * _MAX_RETRIES
 
 
 # ---------------------------------------------------------------------------
@@ -143,20 +144,39 @@ def test_p13_skip_failures(total, num_failures, tmp_path):
     num_failures = min(num_failures, total)
     config = make_config(str(tmp_path), num_scenarios=total)
 
-    call_count = {"n": 0}
+    # Track which scenario index the pipeline is on via ScenarioGenerator call count.
+    # Failures are permanent: scenarios 0..num_failures-1 always raise.
+    scenario_call = {"n": 0}
 
     def build_side_effect():
-        idx = call_count["n"]
-        call_count["n"] += 1
+        idx = scenario_call["n"]
+        scenario_call["n"] += 1
         if idx < num_failures:
             raise RuntimeError(f"Simulated failure {idx}")
         return _make_mock_env(), {}
 
     with patch("flatland_sim.pipeline.ScenarioGenerator") as MockGen, \
          patch("flatland_sim.pipeline.SimulationRunner") as MockRunner:
-        MockGen.return_value.build.side_effect = build_side_effect
+        # Every call to build raises or succeeds based on cumulative count.
+        # Failed scenarios exhaust all retries (each retry increments the counter),
+        # so we need every retry for a "failing" scenario to also fail.
+        # Simplest: make the first num_failures scenarios always fail by
+        # raising on every attempt, then succeed for the rest.
+        from flatland_sim.pipeline import _MAX_RETRIES
+        fail_threshold = num_failures * _MAX_RETRIES
+
+        call_count = {"n": 0}
+
+        def counting_build():
+            idx = call_count["n"]
+            call_count["n"] += 1
+            if idx < fail_threshold:
+                raise RuntimeError(f"Simulated failure {idx}")
+            return _make_mock_env(), {}
+
+        MockGen.return_value.build.side_effect = counting_build
         mock_runner_instance = MockRunner.return_value
-        mock_runner_instance.run.return_value = []
+        mock_runner_instance.run.return_value = [{"step": 0, "agents": []}]
 
         result = Pipeline(config).run()
 
@@ -181,7 +201,7 @@ def test_p14_serialization_round_trip(seed, tmp_path):
          patch("flatland_sim.pipeline.SimulationRunner") as MockRunner:
         MockGen.return_value.build.side_effect = build_side_effect
         mock_runner_instance = MockRunner.return_value
-        mock_runner_instance.run.return_value = []
+        mock_runner_instance.run.return_value = [{"step": 0, "agents": []}]
 
         returned = Pipeline(config).run()
 
@@ -225,7 +245,7 @@ def test_parent_dir_creation(tmp_path):
          patch("flatland_sim.pipeline.SimulationRunner") as MockRunner:
         MockGen.return_value.build.side_effect = build_side_effect
         mock_runner_instance = MockRunner.return_value
-        mock_runner_instance.run.return_value = []
+        mock_runner_instance.run.return_value = [{"step": 0, "agents": []}]
 
         Pipeline(config).run()
 
@@ -248,7 +268,7 @@ def test_pipeline_output_paths(tmp_path):
          patch("flatland_sim.pipeline.SimulationRunner") as MockRunner:
         MockGen.return_value.build.side_effect = build_side_effect
         mock_runner_instance = MockRunner.return_value
-        mock_runner_instance.run.return_value = []
+        mock_runner_instance.run.return_value = [{"step": 0, "agents": []}]
 
         pipeline = Pipeline(config)
 
